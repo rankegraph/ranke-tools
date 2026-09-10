@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.4.0 — 2026-09-10
+
 **`make upgrade` moves the `ranke-go` pin as well as the server's.** The module
 every tool signs its claims with and the `ranke-db` release the dev server runs
 both carry the graph contract, so one command takes both to their latest release
