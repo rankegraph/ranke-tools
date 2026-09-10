@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // TestParseCVE pins the --cve syntax: a bare id, or id=url.

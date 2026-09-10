@@ -6,3 +6,7 @@ docs/papers/
 *.test
 *.out
 .DS_Store
+
+# sindri hub artifacts (agent worktrees + hub state) — not for the repo
+.worktrees/
+.todos/

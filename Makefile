@@ -32,7 +32,11 @@ TOOLS := ranke-git
 # sets it to stamp the tag into every tool's own main package.
 LDFLAGS ?=
 
-RANKE_DB_REPO ?= flocko-motion/ranke-db
+RANKE_DB_REPO ?= rankegraph/ranke-db
+
+# The one dependency that carries the graph contract: every tool here builds and signs
+# its claims with it, as an external consumer of the public module (see README.md).
+RANKE_GO_MODULE ?= github.com/rankegraph/ranke-go
 
 .PHONY: all help build test vet fmt lint check tidy docs docs-clean upgrade check-clean-tree check-release-bump \
         release-gate release major minor patch breaking feature fix
@@ -104,7 +108,7 @@ docs: ## Pull the latest ranke-graph documents (papers, spec, glossary) into doc
 docs-clean: ## Remove the pulled paper references
 	rm -rf $(PAPERS_DIR)
 
-upgrade: ## Bump server/.rankedb-version to ranke-db's latest release and install it (analog to ranke-db's own `make upgrade`)
+upgrade: ## Move every pin to its latest: the ranke-go module, ranke-db's release binary (and install it), and the cached release-cycle.sh
 	@command -v curl >/dev/null 2>&1 || { echo "ERROR: curl not found"; exit 1; }
 	@latest=$$(curl -fsSL https://api.github.com/repos/$(RANKE_DB_REPO)/releases/latest \
 		| grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4); \
@@ -117,6 +121,9 @@ upgrade: ## Bump server/.rankedb-version to ranke-db's latest release and instal
 		echo "$$latest" > server/.rankedb-version; \
 	fi
 	@./server/install.sh
+	@before=$$(go list -m -f '{{.Version}}' $(RANKE_GO_MODULE)); \
+		go get $(RANKE_GO_MODULE)@latest && go mod tidy && \
+		echo ">> $(RANKE_GO_MODULE): $$before -> $$(go list -m -f '{{.Version}}' $(RANKE_GO_MODULE))"
 	@rm -f $(RELEASE_CYCLER)
 	@$(MAKE) $(RELEASE_CYCLER)
 

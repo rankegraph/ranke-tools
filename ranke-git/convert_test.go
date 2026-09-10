@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // testIdentity mints a throwaway root contributor claim and its signing key — a

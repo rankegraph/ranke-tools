@@ -57,7 +57,12 @@ echo ">> explorer at $url/explorer"
 echo ">> try:  curl $url/health  ·  curl $url/branches  ·  curl $url/branches/main/head"
 echo ">> ctrl-c (or server/stop.sh from another shell) to stop"
 
-RANKE_SIGNER_KEY="$(openssl genpkey -algorithm ed25519)" "$BIN" run --dev "$run_config" &
+# In-memory storage means every launch starts on an empty bookmark list, holding no
+# archive until one is founded. The founder's public half is all the server wants; the
+# private half goes with the process, since the tools mint their own contributors.
+founder_pubkey="$(openssl genpkey -algorithm ed25519 | openssl pkey -pubout)"
+
+RANKE_SIGNER_KEY="$(openssl genpkey -algorithm ed25519)" RANKE_FOUNDER_PUBKEY="$founder_pubkey" "$BIN" run --dev "$run_config" &
 child=$!
 echo "$child" >"$PID_FILE"
 trap 'kill "$child" 2>/dev/null || true; rm -f "$PID_FILE"; [ "$run_config" = "$CONFIG" ] || rm -f "$run_config"' EXIT INT TERM

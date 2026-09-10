@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // mediaCBORSeq is what POST /contribute reads: an RFC 8742 CBOR sequence.

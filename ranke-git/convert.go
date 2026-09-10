@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // gitPrefix namespaces every source/derivation subtype — a bare word like

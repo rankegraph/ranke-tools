@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // TestBlobAndEntryPathFields pins the path field added for readability
