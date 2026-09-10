@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.10.0 — 2026-09-10
+
 **A claim's height counts the contributor claim signing it.** `ranke-git`
 read the height off its target alone — `target.height + 1` — which lands
 below a contributor whose own claim stands higher, and `V-HEIGHT` refuses
