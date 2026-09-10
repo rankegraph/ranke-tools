@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.11.0 — 2026-09-10
+
 **`entity/version` — the tag or commit a run archived, as a thing in the
 world.** Every `snapshot` and `backup` now finds or builds one beside the
 repository and project entities: named by the tag where a tag was archived
