@@ -7,7 +7,7 @@
 # Usage: server/install.sh
 set -euo pipefail
 
-REPO="flocko-motion/ranke-db"
+REPO="rankegraph/ranke-db"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="$DIR/rankedb"
 VERSION_FILE="$DIR/.rankedb-version"

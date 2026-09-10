@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -76,4 +77,81 @@ func TestLoadConfigNoPathIsANoop(t *testing.T) {
 	if o.branch != "untouched" {
 		t.Errorf("branch = %q, want it left alone", o.branch)
 	}
+}
+
+// TestSnapshotTargetNamesOneCommit pins the three spellings and the two ways
+// of naming no commit at all.
+func TestSnapshotTargetNamesOneCommit(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		ref, branch, tag string
+		want             string
+		wantErr          string
+	}{
+		{name: "ref passes through", ref: "HEAD~2", want: "HEAD~2"},
+		{name: "branch is a heads ref", branch: "main", want: "refs/heads/main"},
+		{name: "tag is a tags ref", tag: "v1.0.0", want: "refs/tags/v1.0.0"},
+		{name: "nothing", wantErr: "one of --ref, --git-branch, or --git-tag is required"},
+		{name: "two at once", ref: "HEAD", tag: "v1.0.0", wantErr: "--ref and --git-tag name a commit each"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := snapshotTarget(tc.ref, tc.branch, tc.tag)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("err = %v, want one containing %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("snapshotTarget: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("target = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSnapshotTargetSeparatesATagFromASameNamedBranch is why --git-tag earns
+// its place beside --ref: git resolves the bare name to the branch, so a
+// snapshot of the tag has no other way to ask for it.
+func TestSnapshotTargetSeparatesATagFromASameNamedBranch(t *testing.T) {
+	dir := t.TempDir()
+	g := initRepo(t, dir)
+	writeFile(t, dir, "a.txt", []byte("one\n"), 0o644)
+	tagged := commitAll(t, g, "tagged")
+	if _, err := g.run("tag", "release"); err != nil {
+		t.Fatalf("git tag: %v", err)
+	}
+	writeFile(t, dir, "a.txt", []byte("two\n"), 0o644)
+	tip := commitAll(t, g, "later")
+	if _, err := g.run("branch", "release"); err != nil {
+		t.Fatalf("git branch: %v", err)
+	}
+
+	for _, tc := range []struct {
+		spelling string
+		target   string
+		want     string
+	}{
+		{"--git-tag", mustSnapshotTarget(t, "", "", "release"), tagged},
+		{"--git-branch", mustSnapshotTarget(t, "", "release", ""), tip},
+	} {
+		sha, err := resolveCommit(g, tc.target)
+		if err != nil {
+			t.Fatalf("%s: resolve %q: %v", tc.spelling, tc.target, err)
+		}
+		if sha != tc.want {
+			t.Errorf("%s resolved to %s, want %s", tc.spelling, sha, tc.want)
+		}
+	}
+}
+
+func mustSnapshotTarget(t *testing.T, ref, branch, tag string) string {
+	t.Helper()
+	target, err := snapshotTarget(ref, branch, tag)
+	if err != nil {
+		t.Fatalf("snapshotTarget: %v", err)
+	}
+	return target
 }

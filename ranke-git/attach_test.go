@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // TestSubtypeCharsMatchesChecksubtype pins the ADT's own rule (checkSubtype,

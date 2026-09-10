@@ -17,13 +17,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // demoServerBranch, demoServerRepoURL and demoServerProject are fixed, so
 // running this command twice shows entity and content_hash reuse.
 const (
-	demoServerBranch   = "ranke-git-demo-server"
+	demoServerBranch   = "ranke_git_demo_server" // branch names are [a-z0-9_]
 	demoServerRepoURL  = "https://example.com/ranke-git-demo-server.git"
 	demoServerProject  = "ranke-git-demo-server"
 	demoServerDefault  = "localhost:8080"

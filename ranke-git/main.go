@@ -10,12 +10,13 @@ import (
 	"crypto"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // version is stamped at release build time (-ldflags "-X main.version=vX.Y.Z",
@@ -129,25 +130,54 @@ func rootCmd() *cobra.Command {
 // snapshotCmd archives one commit's tree: the exact source an artifact was built from.
 // No `.git` comes back — no history, no refs, just that one commit's files, byte-exact.
 func snapshotCmd(o *options) *cobra.Command {
-	var ref string
+	var ref, branch, tag string
 	c := &cobra.Command{
 		Use:   "snapshot",
 		Short: "Archive one commit's tree, byte-exact — no history, no refs",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if ref == "" {
-				return fmt.Errorf("snapshot: --ref is required")
+			target, err := snapshotTarget(ref, branch, tag)
+			if err != nil {
+				return err
 			}
 			g, err := localRepo(o)
 			if err != nil {
 				return err
 			}
 			return run(cmd, o, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
-				return gitToClaims(ctx, g, ref, o.paths, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
+				return gitToClaims(ctx, g, target, o.paths, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
 			})
 		},
 	}
-	c.Flags().StringVar(&ref, "ref", "", "the tag or commit to archive (required)")
+	c.Flags().StringVar(&ref, "ref", "", "the tag, branch, or commit to archive, resolved git's own way")
+	c.Flags().StringVar(&branch, "git-branch", "", "the git branch whose tip to archive — backup's spelling, for one commit")
+	c.Flags().StringVar(&tag, "git-tag", "", "the git tag whose commit to archive — backup's spelling, for one commit")
 	return c
+}
+
+// snapshotTarget names the single commit a snapshot archives. --git-branch and
+// --git-tag are backup's flags, spelled the same here so one repo's tag reads
+// alike in both commands; each resolves under its own refs/ namespace, which
+// --ref leaves to git's resolution order.
+func snapshotTarget(ref, branch, tag string) (string, error) {
+	var given []string
+	for _, f := range []struct {
+		flag, value string
+	}{{"--ref", ref}, {"--git-branch", branch}, {"--git-tag", tag}} {
+		if f.value != "" {
+			given = append(given, f.flag)
+		}
+	}
+	switch {
+	case len(given) == 0:
+		return "", fmt.Errorf("snapshot: one of --ref, --git-branch, or --git-tag is required")
+	case len(given) > 1:
+		return "", fmt.Errorf("snapshot: %s name a commit each — give one", strings.Join(given, " and "))
+	case branch != "":
+		return refSpec{kind: "branch", name: branch}.fullRef(), nil
+	case tag != "":
+		return refSpec{kind: "tag", name: tag}.fullRef(), nil
+	}
+	return ref, nil
 }
 
 // backupCmd archives every commit reachable from the given branches and tags, each

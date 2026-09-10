@@ -3,7 +3,7 @@
 Archives git state into a running `ranke-db`, byte-exact and content-deduplicated —
 so a force-push or a squash can never erase what it already captured. A pure REST
 client: it never starts a server itself, never touches `ranke-db`'s own module, only
-`github.com/flocko-motion/ranke-go` to build and sign claims.
+`github.com/rankegraph/ranke-go` to build and sign claims.
 
 For the design decisions behind these shapes — why `path` sits where it does, why
 `entity/cve` is unprefixed, the whole claim/edge layout — see [DESIGN.md](./DESIGN.md).
@@ -11,7 +11,7 @@ For the design decisions behind these shapes — why `path` sits where it does, 
 ## Install
 
 ```sh
-go install github.com/flocko-motion/ranke-tools/ranke-git@latest
+go install github.com/rankegraph/ranke-tools/ranke-git@latest
 ```
 
 Or build from a checkout: `make -C .. build` (repo root), producing `bin/ranke-git`.
@@ -53,7 +53,13 @@ working clone — no `.git`, no history, no refs.
 
 ```sh
 ranke-git snapshot --ref <tag-or-commit> ...
+ranke-git snapshot --git-tag v1.0.0 ...        # backup's spelling, for one commit
+ranke-git snapshot --git-branch main ...       # that branch's tip
 ```
+
+Name the commit once, in whichever of the three spellings suits: `--ref` resolves
+the name git's own way, `--git-tag` and `--git-branch` resolve under `refs/tags/`
+and `refs/heads/`, which tells a tag from a branch that carries the same name.
 
 ### `backup` — a reconstructible clone
 

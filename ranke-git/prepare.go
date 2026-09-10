@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flocko-motion/ranke-go"
+	"github.com/rankegraph/ranke-go"
 )
 
 // prepare finds or builds the repository and project entities and scans every git

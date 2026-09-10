@@ -13,8 +13,10 @@
   },
   "sequencer": {
     "type": "dev",
-    "history": {
-      "type": "mem"
+    "seed": "ranke-tools-dev-server",
+    "found": {
+      "pubkey": "env(RANKE_FOUNDER_PUBKEY)",
+      "branch": "main"
     }
   },
   "accounts": {
