@@ -7,6 +7,23 @@ does not.
 
 ## Unreleased
 
+## v0.6.0 — 2026-09-10
+
+**`--signing-key` reads the key from wherever the platform keeps it.** A bare
+path still works, and `file:PATH`, `env:NAME`, `stdin` and `prompt` join it.
+`env:` is the CI one: the runner is handed the PEM as environment and never
+writes it to disk. The grammar is `keysource` in ranke-go, shared by every app
+built on the library rather than spelled out again here.
+
+**A signing key that others can read, or that was passed as material, is
+refused.** A key file readable beyond its owner is rejected as `ssh` rejects
+one — `identity register` has always written `0600` — and a PEM handed over
+where a source belongs is rejected as compromised, having reached the process
+table, the shell history and any CI log. Both rules come from `keysource`.
+
+**ranke-go moves to v0.31.0**, whose `keysource` package and `Parse*` key
+readers replace the PEM loading `ranke-git` had written for itself.
+
 ## v0.5.0 — 2026-09-10
 
 **`--signing-key` finds its own contributor.** `ranke-git` reads the branch's

@@ -96,7 +96,7 @@ func runIdentityRegister(cmd *cobra.Command, o *options, out string) error {
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "registered contributor %s on branch %q\n", claim.ID(), o.branch)
-	fmt.Fprintf(cmd.OutOrStdout(), "signing key written to %s (0600) — store it safely, then pass\n  --signing-key %s\n", out, out)
+	fmt.Fprintf(cmd.OutOrStdout(), "signing key written to %s (0600) — store it safely, then pass\n  --signing-key %s   (or env:VAR, holding the PEM, on a CI runner)\n", out, out)
 	fmt.Fprintf(cmd.OutOrStdout(), "the key finds this contributor on its own; --contributor-id %s names it where a branch holds two identities under one key\n", claim.ID())
 	return nil
 }

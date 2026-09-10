@@ -39,7 +39,7 @@ type options struct {
 	token         string   // Authorization: Bearer credential
 	apiKey        string   // X-API-Key credential
 	contributorID string   // this worker's contributor claim id, already on the archive
-	signingKey    string   // path to the contributor's ed25519 private key (PEM)
+	signingKey    string   // where the contributor's ed25519 private key is: a path, or file:|env:|stdin|prompt
 	repoURL       string   // the repo's remote URL, naming the entity; the clone's origin when unset
 	clone         string   // an existing local clone to read instead of cloning repoURL
 	project       string   // the project name — its own entity, distinct from the repo; derived from repoURL when unset
@@ -117,7 +117,7 @@ func rootCmd() *cobra.Command {
 	f.StringVar(&o.token, "token", "", "Authorization: Bearer credential")
 	f.StringVar(&o.apiKey, "api-key", "", "X-API-Key credential")
 	f.StringVar(&o.contributorID, "contributor-id", "", "this worker's contributor claim id (default: the one carrying --signing-key's public key)")
-	f.StringVar(&o.signingKey, "signing-key", "", "path to the contributor's ed25519 private key, PEM (required)")
+	f.StringVar(&o.signingKey, "signing-key", "", "where the contributor's ed25519 private key is, PEM: a path, or file:path|env:VAR|stdin|prompt (required)")
 	f.StringVar(&o.repoURL, "repo", "", "the repo's remote URL — names the repo entity (default: the clone's origin)")
 	f.StringVar(&o.clone, "clone", "", "an existing local clone to read, instead of cloning --repo")
 	f.StringVar(&o.project, "project", "", "the project name — its own entity, distinct from the repo (default: the repo URL's last segment)")

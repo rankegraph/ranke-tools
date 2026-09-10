@@ -1,6 +1,12 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -91,5 +97,64 @@ func TestResolveRefReportsAnUnusableClone(t *testing.T) {
 	_, err := resolveRef(gitRepo{dir: t.TempDir()}, "refs/tags/v1.0.0")
 	if err == nil || strings.Contains(err.Error(), "no tag") {
 		t.Errorf("err = %v, want one about the clone itself", err)
+	}
+}
+
+// writeKey writes a fresh PKCS#8 PEM key at mode, the shape identity
+// register writes and loadSigningKey reads back.
+func writeKey(t *testing.T, dir, name string, mode os.FileMode) (string, []byte, ed25519.PrivateKey) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatalf("marshal key: %v", err)
+	}
+	body := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, body, mode); err != nil {
+		t.Fatalf("write key: %v", err)
+	}
+	return path, body, priv
+}
+
+// TestLoadSigningKeySources pins every spelling of --signing-key, the CI one
+// (env:VAR) included, against the same key read from a file.
+func TestLoadSigningKeySources(t *testing.T) {
+	dir := t.TempDir()
+	path, body, priv := writeKey(t, dir, "contributor.pem", 0o600)
+	t.Setenv("RANKE_TEST_KEY", string(body))
+
+	for _, source := range []string{path, "file:" + path, "env:RANKE_TEST_KEY"} {
+		got, err := loadSigningKey(source)
+		if err != nil {
+			t.Fatalf("loadSigningKey(%q): %v", source, err)
+		}
+		if !got.Equal(priv) {
+			t.Errorf("loadSigningKey(%q) returned a different key", source)
+		}
+	}
+}
+
+// TestLoadSigningKeyRefusals pins that keysource's rules reach the caller —
+// the mode check, the missing variable, and above all key material passed
+// where a source belongs, which upstream reports as compromised.
+func TestLoadSigningKeyRefusals(t *testing.T) {
+	dir := t.TempDir()
+	loose, material, _ := writeKey(t, dir, "loose.pem", 0o644)
+
+	for _, tc := range []struct{ source, want string }{
+		{loose, "readable by others"},
+		{string(material), "treat this key as compromised"},
+		{"env:RANKE_TEST_KEY_UNSET", "is unset"},
+		{"file:", "names no file"},
+		{filepath.Join(dir, "absent.pem"), "no such file"},
+	} {
+		_, err := loadSigningKey(tc.source)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("loadSigningKey(%q) = %v, want one containing %q", tc.source, err, tc.want)
+		}
 	}
 }

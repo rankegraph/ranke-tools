@@ -21,8 +21,8 @@ github.com/multiformats/go-multihash v0.2.3 h1:7Lyc8XfX/IY2jWb/gI7JP+o7JEq9hOa7B
 github.com/multiformats/go-multihash v0.2.3/go.mod h1:dXgKXCXjBzdscBLk9JkjINiEsCKRVch90MdaGiKsvSM=
 github.com/multiformats/go-varint v0.1.0 h1:i2wqFp4sdl3IcIxfAonHQV9qU5OsZ4Ts9IOoETFs5dI=
 github.com/multiformats/go-varint v0.1.0/go.mod h1:5KVAVXegtfmNQQm/lCY+ATvDzvJJhSkUlGQV9wgObdI=
-github.com/rankegraph/ranke-go v0.30.0 h1:Q/s9+r4dEfXW2Sawm1UmK1r1aw4NJcVwvB3/HZaEMTk=
-github.com/rankegraph/ranke-go v0.30.0/go.mod h1:qXRVqMCeFfgnHIYrYyRn/FsRszjy0GvwxVoMMVKLY8c=
+github.com/rankegraph/ranke-go v0.31.0 h1:CYzxp4OiDxYdHvxO3aO08LRiCjY8b/6+ra8RMIb8R8I=
+github.com/rankegraph/ranke-go v0.31.0/go.mod h1:qXRVqMCeFfgnHIYrYyRn/FsRszjy0GvwxVoMMVKLY8c=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
 github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
