@@ -3,7 +3,7 @@ module github.com/rankegraph/ranke-tools
 go 1.27.1
 
 require (
-	github.com/rankegraph/ranke-db v1.27.0
+	github.com/rankegraph/ranke-db v1.27.1
 	github.com/rankegraph/ranke-go v0.32.0
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1

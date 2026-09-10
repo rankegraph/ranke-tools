@@ -156,7 +156,7 @@ func findOrBuildCVE(
 		WithInlineContent([]byte(f.id)).
 		WithEncoding(ranke.EncodingPlain).
 		WithCreatedAt(at).
-		WithHeight(target.height+1).
+		WithHeight(heightOver(contributor, target.height)).
 		WithField(cveIDField, f.id).
 		WithEdges(input)
 	if f.url != "" {
@@ -166,7 +166,7 @@ func findOrBuildCVE(
 	if err != nil {
 		return reused{}, nil, fmt.Errorf("scan: cve %s: %w", f.id, err)
 	}
-	return reused{id: claim.ID(), height: target.height + 1}, claim, nil
+	return reused{id: claim.ID(), height: heightOver(contributor, target.height)}, claim, nil
 }
 
 // buildScan signs the derivation/vulnerability_scan claim: external content
@@ -182,7 +182,7 @@ func buildScan(
 	}
 	b := ranke.NewClaim(nodeScan, contributor).
 		WithCreatedAt(at).
-		WithHeight(targetHeight + 1).
+		WithHeight(heightOver(contributor, targetHeight)).
 		WithEdges(edges...)
 	if len(content) > 0 {
 		id, err := ranke.HashContent(content)

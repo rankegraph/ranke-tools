@@ -51,6 +51,18 @@ const (
 // a snapshot/backup, never a file — restoring a later breaking change with.
 const versionField = "ranke_git_version"
 
+// heightOver is one above the tallest claim a new one references, its
+// contributor among them (V-HEIGHT, -> DESIGN.md).
+func heightOver(contributor ranke.Contributor, refs ...uint64) uint64 {
+	h := contributor.Node().Height()
+	for _, r := range refs {
+		if r > h {
+			h = r
+		}
+	}
+	return h + 1
+}
+
 // made is a claim this walk knows about: built fresh (claim set), or already
 // on the server and reused (claim nil — nothing new to contribute for it).
 type made struct {
@@ -474,12 +486,13 @@ func (c *converter) write(typ string, payload []byte, fields map[string]string, 
 	if err := c.u.PutContents(c.ctx, []ranke.ContentBlob{{Hash: id, Content: payload}}); err != nil {
 		return made{}, fmt.Errorf("store content: %w", err)
 	}
+	height := heightOver(c.contributor, childHeight)
 	b := ranke.NewClaim(typ, c.contributor).
 		WithExternalContent(id, uint64(len(payload))).
 		WithEncoding(ranke.EncodingOctetStream).
 		WithCreatedAt(c.at).
 		WithDatedEDTF(dated).
-		WithHeight(childHeight + 1).
+		WithHeight(height).
 		WithEdges(edges...)
 	for k, v := range fields {
 		b = b.WithField(k, v)
@@ -489,7 +502,7 @@ func (c *converter) write(typ string, payload []byte, fields map[string]string, 
 		return made{}, err
 	}
 	c.claims = append(c.claims, claim)
-	return made{id: claim.ID(), claim: claim, height: childHeight + 1}, nil
+	return made{id: claim.ID(), claim: claim, height: height}, nil
 }
 
 // repository reuses prep's match if one was found; otherwise builds
@@ -546,11 +559,12 @@ func (c *converter) project(name string, commit, repo made) (made, error) {
 // writeFact builds one small claim with no git object of its own — an entity
 // or a ref: inline content, fields for a later find-or-build lookup.
 func (c *converter) writeFact(typ string, content []byte, fields map[string]string, childHeight uint64, edges []ranke.Edge) (made, error) {
+	height := heightOver(c.contributor, childHeight)
 	b := ranke.NewClaim(typ, c.contributor).
 		WithInlineContent(content).
 		WithEncoding(ranke.EncodingPlain).
 		WithCreatedAt(c.at).
-		WithHeight(childHeight + 1).
+		WithHeight(height).
 		WithEdges(edges...)
 	for k, v := range fields {
 		b = b.WithField(k, v)
@@ -560,7 +574,7 @@ func (c *converter) writeFact(typ string, content []byte, fields map[string]stri
 		return made{}, err
 	}
 	c.claims = append(c.claims, claim)
-	return made{id: claim.ID(), claim: claim, height: childHeight + 1}, nil
+	return made{id: claim.ID(), claim: claim, height: height}, nil
 }
 
 // claimsToGit restores claims into dest: objects replayed, refs recreated
