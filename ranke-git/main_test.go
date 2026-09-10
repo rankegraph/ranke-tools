@@ -79,9 +79,9 @@ func TestLoadConfigNoPathIsANoop(t *testing.T) {
 	}
 }
 
-// TestSnapshotTargetNamesOneCommit pins the three spellings and the two ways
+// TestRefTargetNamesOneCommit pins the three spellings and the two ways
 // of naming no commit at all.
-func TestSnapshotTargetNamesOneCommit(t *testing.T) {
+func TestRefTargetNamesOneCommit(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
 		ref, branch, tag string
@@ -95,7 +95,7 @@ func TestSnapshotTargetNamesOneCommit(t *testing.T) {
 		{name: "two at once", ref: "HEAD", tag: "v1.0.0", wantErr: "--ref and --git-tag name a commit each"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := snapshotTarget(tc.ref, tc.branch, tc.tag)
+			got, err := refTarget(tc.ref, tc.branch, tc.tag)
 			if tc.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Fatalf("err = %v, want one containing %q", err, tc.wantErr)
@@ -103,7 +103,7 @@ func TestSnapshotTargetNamesOneCommit(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("snapshotTarget: %v", err)
+				t.Fatalf("refTarget: %v", err)
 			}
 			if got != tc.want {
 				t.Errorf("target = %q, want %q", got, tc.want)
@@ -112,10 +112,10 @@ func TestSnapshotTargetNamesOneCommit(t *testing.T) {
 	}
 }
 
-// TestSnapshotTargetSeparatesATagFromASameNamedBranch is why --git-tag earns
+// TestRefTargetSeparatesATagFromASameNamedBranch is why --git-tag earns
 // its place beside --ref: git resolves the bare name to the branch, so a
 // snapshot of the tag has no other way to ask for it.
-func TestSnapshotTargetSeparatesATagFromASameNamedBranch(t *testing.T) {
+func TestRefTargetSeparatesATagFromASameNamedBranch(t *testing.T) {
 	dir := t.TempDir()
 	g := initRepo(t, dir)
 	writeFile(t, dir, "a.txt", []byte("one\n"), 0o644)
@@ -134,8 +134,8 @@ func TestSnapshotTargetSeparatesATagFromASameNamedBranch(t *testing.T) {
 		target   string
 		want     string
 	}{
-		{"--git-tag", mustSnapshotTarget(t, "", "", "release"), tagged},
-		{"--git-branch", mustSnapshotTarget(t, "", "release", ""), tip},
+		{"--git-tag", mustRefTarget(t, "", "", "release"), tagged},
+		{"--git-branch", mustRefTarget(t, "", "release", ""), tip},
 	} {
 		sha, err := resolveCommit(g, tc.target)
 		if err != nil {
@@ -147,11 +147,11 @@ func TestSnapshotTargetSeparatesATagFromASameNamedBranch(t *testing.T) {
 	}
 }
 
-func mustSnapshotTarget(t *testing.T, ref, branch, tag string) string {
+func mustRefTarget(t *testing.T, ref, branch, tag string) string {
 	t.Helper()
-	target, err := snapshotTarget(ref, branch, tag)
+	target, err := refTarget(ref, branch, tag)
 	if err != nil {
-		t.Fatalf("snapshotTarget: %v", err)
+		t.Fatalf("refTarget: %v", err)
 	}
 	return target
 }

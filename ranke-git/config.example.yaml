@@ -9,12 +9,16 @@ server: https://ranke-db.example.com
 token: ""
 api_key: ""
 
+# Omit contributor_id to sign as whichever contributor carries this key.
 contributor_id: ""
 signing_key: /path/to/contributor.pem
 
+# Omit to take the checkout's own origin.
 repo: https://github.com/acme/widgets.git
 # clone: /path/to/an/existing/checkout   # read this instead of cloning `repo`
 
+# Omit to take the repo URL's last segment; name it here for a monorepo's
+# several projects.
 project: widgets
 branch: main
 

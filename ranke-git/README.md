@@ -19,11 +19,13 @@ Or build from a checkout: `make -C .. build` (repo root), producing `bin/ranke-g
 ## Quickstart
 
 Every command needs a server, an already-registered contributor, and (for
-`snapshot`/`backup`) a repo and project name. Mint a contributor once:
+`snapshot`/`backup`) a checkout to read. `--repo` defaults to that checkout's
+`origin`, and the project to the repo URL's last segment, so a CI job that
+checked the repo out already names both: `--project` is for a monorepo, where
+one repo holds several. Mint a contributor once:
 
 ```sh
 ranke-git identity register --server https://ranke-db.example.com --out contributor.pem
-# prints a --contributor-id to reuse below
 ```
 
 Then archive a commit:
@@ -31,10 +33,20 @@ Then archive a commit:
 ```sh
 ranke-git snapshot \
   --server https://ranke-db.example.com \
-  --contributor-id <id printed above> --signing-key contributor.pem \
-  --clone /path/to/local/checkout --repo https://github.com/acme/widgets.git \
-  --project widgets --ref HEAD
+  --signing-key contributor.pem \
+  --clone /path/to/local/checkout --ref HEAD
+# contributor: the one carrying this key · repo: the clone's origin · project: widgets
 ```
+
+The key names the identity: `ranke-git` reads the branch's contributors and
+signs as the one whose public key matches. `--contributor-id` picks between
+them where one key was registered twice, two identities carrying different
+provenance.
+
+A URL carrying credentials — `https://gitlab-ci-token:<token>@…`, as some
+runners check out with — is recorded without them, since the repo URL becomes
+the repository entity's own name. An ssh remote keeps its `git@`, which a
+restore needs to reconfigure `origin`.
 
 A [`--config`](./config.example.yaml) YAML file is a standing alternative to typing
 every flag by hand — a flag given on the command line still wins over what's in it.
@@ -77,13 +89,44 @@ process produces after `snapshot`/`backup` already ran. The driving case: CI
 archives the repo, then attaches its own logs and outputs against the same commit.
 
 ```sh
-ranke-git attach --commit <sha> --type build_log --name "release build log" \
-  --content-type text/plain --file build.log
+gh run view "$RUN_ID" --log | ranke-git attach --git-tag v1.0.0 \
+  --type build_log --name "release build log"
+
+gh release download v1.0.0 --dir assets
+ranke-git attach --git-tag v1.0.0 --type artifact assets
 ```
 
+Name the commit with `--commit <sha>`, or with `--ref`, `--git-tag` or
+`--git-branch`, which resolve it in `--clone` the way `snapshot` does — the
+release tag a CI job already has in hand, rather than a `git rev-parse` of
+its own.
+
 `--type` becomes `source/git_<type>` — never a bare string, never parsed by
-`ranke-git` itself. `--file` omitted reads stdin, so a CI step can pipe its own
-log straight through.
+`ranke-git` itself. With no path given, `attach` reads stdin, so a CI step
+pipes its own log through without writing it down.
+
+Each path is a file or a directory, a directory standing for every file
+beneath it, named by its path within (`linux/tool`). Every file becomes its
+own claim, and the batch is contributed in one go. Symlinks are skipped, and
+the run prints each attachment as it goes:
+
+```
+>> linux/tool — application/octet-stream, 4194304 byte(s)
+>> site.tar.gz — application/gzip, 1049182 byte(s), sha256:db54a0dc…
+```
+
+`--content-type` is the media type; left out, the file extension decides, and
+failing that the bytes themselves. `--name` titles a single attachment, which
+a whole directory has no room for — there, each file keeps its own name.
+
+`--checksum` records the digest a release publishes alongside its artifact, as
+the claim's `checksum` field, in the form `<alg>:<hex>` — `sha256` where the
+algorithm is left out, and `md5`, `sha1`, `sha256` or `sha512` where it is
+given. `--checksum-file` reads it from a shasum-style file instead. Inside a
+directory this happens on its own: `site.tar.gz.sha256` beside `site.tar.gz`
+becomes that artifact's `checksum` field rather than an attachment of its own.
+Either way `ranke-git` computes the digest over the content it is about to
+attach and refuses a mismatch, so the field states a checksum that was checked.
 
 ### `scan` — record a vulnerability scan's findings
 

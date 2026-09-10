@@ -157,6 +157,31 @@ Two axes, both settable, kept independent:
 filename, the same field `entity/project` and `source/git_ref` already
 use for the same purpose.
 
+The target commit is named by `--commit`, or by `--ref`/`--git-tag`/
+`--git-branch` resolved in `--clone`. That is one `rev-parse`, the whole of
+attach's business with git: the release process holds a tag, and making it
+convert that to a sha by hand was work this tool can do. Everything after
+stays server- and content-facing, as before.
+
+A run attaches as many files as it is given: each positional path is a file,
+or a directory standing for every file beneath it, and each file becomes its
+own claim named by its path within that directory. They contribute as one
+batch, so a release's whole asset set advances the head once. What the forge
+is — how those files got downloaded — stays outside: `gh release download`
+writes a directory, `attach` reads one, and `ranke-git` learns nothing about
+GitHub.
+
+`--checksum` adds one optional field, `checksum`, holding `<alg>:<hex>`. The
+archive already content-addresses the bytes, so this records a different fact:
+the digest the release process published, in the algorithm a downstream
+consumer will check against. `ranke-git` computes that digest over the content
+first and refuses a mismatch — a checksum nobody verified would be a signed
+claim resting on the operator's typing. Within a directory the pairing is
+automatic: `site.tar.gz.sha256` names `site.tar.gz`, which is in the same
+batch, so the digest becomes that artifact's field. The rule is that narrow on
+purpose — a `.sha256` whose file is absent stays an attachment of its own,
+rather than disappearing into a claim nothing else names.
+
 The claim cites its target via `relation/attached_to` (`RelationTo`) — a
 relation, not a `derivation/input`: the attachment isn't an interpretation of
 the commit's content, it's evidence associated with the same point in time,
@@ -236,8 +261,18 @@ self-registering one. It refuses to overwrite an existing `--out`, so a re-run n
 silently replaces a key something else already depends on. Storing the written key
 safely (a CI secret store, a vault) is the caller's job — this command's job ends at
 "a real identity now exists and here is its key." Verified live: the printed
-`--contributor-id`/`--signing-key` pair works unmodified as input to a real
-`snapshot` call.
+`--signing-key` works unmodified as input to a real `snapshot` call.
+
+The key is also what finds the identity again. `connect` reads the branch's
+`contribution/contributor` claims and signs as the one whose pubkey matches the
+key on disk, so a run carries one secret rather than a secret and an id that
+have to be kept together — `queries.ContributorsByKey` in ranke-go is the same
+lookup for a caller holding an `Archive`. A lookup only: an identity still comes
+into being through `identity register`, since minting one silently would put an
+unbound contributor into the graph on every typo. `--contributor-id` stays, for
+the case ranke-go names — nothing makes a pubkey unique, so one key registered
+twice is two identities with different provenance, and the run says so rather
+than picking one.
 
 The intended shape this unlocks: a CI step that runs `ranke-git snapshot` on every
 push, using a provisioned identity — the archive grows forward from whenever it's
