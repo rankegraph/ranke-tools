@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.9.0 — 2026-09-10
+
 **`ranke-db` moves to v1.27.0**, client module and dev server binary both.
 Finding the contributor a signing key holds is now `Client.ContributorsFor`,
 a method that reads one scope, where `ranke-git` had queried the branch and
