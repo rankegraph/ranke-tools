@@ -56,7 +56,7 @@ func attachCmd(o *options) *cobra.Command {
 			if !subtypeChars.MatchString(s.kind) {
 				return fmt.Errorf("attach: --type %q must match %s (lowercase letters, digits, underscore; no leading underscore)", s.kind, subtypeChars.String())
 			}
-			sha, err := attachCommit(o, commitSha, ref, gitBranch, gitTag)
+			version, err := attachVersion(o, commitSha, ref, gitBranch, gitTag)
 			if err != nil {
 				return err
 			}
@@ -64,7 +64,7 @@ func attachCmd(o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runAttach(cmd, o, sha, as)
+			return runAttach(cmd, o, version, as)
 		},
 	}
 	c.Flags().StringVar(&commitSha, "commit", "", "the git sha of an already-archived commit")
@@ -79,10 +79,14 @@ func attachCmd(o *options) *cobra.Command {
 	return c
 }
 
-// attachCommit is the sha the attachments cite: --commit as given, or the
-// commit a ref names in --clone. Resolving one is the whole of attach's
-// business with git — it still never walks the repo (-> DESIGN.md).
-func attachCommit(o *options, commitSha, ref, branch, tag string) (string, error) {
+// attachVersion names the entity/version the attachments cite: the tag where
+// one was given, else the sha of the commit named — the same name the
+// archiving run gave that version (-> DESIGN.md). Resolving a ref is the
+// whole of attach's business with git; it still never walks the repo.
+func attachVersion(o *options, commitSha, ref, branch, tag string) (string, error) {
+	if tag != "" && commitSha == "" {
+		return tag, nil
+	}
 	named := ref != "" || branch != "" || tag != ""
 	switch {
 	case commitSha != "" && named:
@@ -90,7 +94,7 @@ func attachCommit(o *options, commitSha, ref, branch, tag string) (string, error
 	case commitSha != "":
 		return commitSha, nil
 	case !named:
-		return "", fmt.Errorf("attach: name the commit to attach to, with --commit, --ref, --git-tag, or --git-branch")
+		return "", fmt.Errorf("attach: name what to attach to, with --git-tag, --commit, --ref, or --git-branch")
 	}
 	g, err := localRepo(o)
 	if err != nil {
@@ -349,21 +353,24 @@ func readStdin(cmd *cobra.Command) ([]byte, error) {
 	return content, nil
 }
 
-// runAttach finds the target commit's claim, builds every attachment citing
+// runAttach finds the version's claim, builds every attachment citing
 // it, and contributes them as one batch — no git repo involved, purely
 // server- and content-facing.
-func runAttach(cmd *cobra.Command, o *options, commitSha string, as []attachment) error {
+func runAttach(cmd *cobra.Command, o *options, version string, as []attachment) error {
 	ctx := cmd.Context()
+	if err := o.resolveNames(); err != nil {
+		return err
+	}
 	s, err := connect(ctx, o)
 	if err != nil {
 		return err
 	}
-	target, err := findOne(ctx, s.client, o.branch, nodeCommit, gitShaField, commitSha)
+	target, err := findVersion(ctx, s.client, o.branch, o.project, version)
 	if err != nil {
 		return fmt.Errorf("attach: %w", err)
 	}
 	if target == nil {
-		return fmt.Errorf("attach: no archived commit with git_sha %q on branch %q", commitSha, o.branch)
+		return fmt.Errorf("attach: no version %q of project %q on branch %q — archive it first, with `ranke-git snapshot`", version, o.project, o.branch)
 	}
 
 	out := cmd.OutOrStdout()

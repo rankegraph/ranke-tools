@@ -96,6 +96,10 @@ The exact source an artifact was built from: one commit's tree, optionally narro
 to a list of `--path`s (a monorepo subset). Restorable as that one commit, not a
 working clone — no `.git`, no history, no refs.
 
+The run also finds or builds three entities: the repository, the project, and the
+`entity/version` this archives — the tag where `--git-tag` named one, the commit's
+own sha otherwise. Attachments cite that version.
+
 ```sh
 ranke-git snapshot --ref <tag-or-commit> ...
 ranke-git snapshot --git-tag v1.0.0 ...        # backup's spelling, for one commit
@@ -115,11 +119,12 @@ restorable as a real, walkable git repository with the same branches and tags ba
 ranke-git backup --git-branch main --git-branch feature --git-tag v1.0.0 ...
 ```
 
-### `attach` — cite arbitrary content onto an archived commit
+### `attach` — cite arbitrary content onto an archived version
 
 A build log, a test report, a platform-specific artifact — anything a release
 process produces after `snapshot`/`backup` already ran. The driving case: CI
-archives the repo, then attaches its own logs and outputs against the same commit.
+archives the repo, then attaches its own logs and outputs against the version
+it just archived.
 
 ```sh
 gh run view "$RUN_ID" --log | ranke-git attach --git-tag v1.0.0 \
@@ -129,10 +134,12 @@ gh release download v1.0.0 --dir assets
 ranke-git attach --git-tag v1.0.0 --type artifact assets
 ```
 
-Name the commit with `--commit <sha>`, or with `--ref`, `--git-tag` or
-`--git-branch`, which resolve it in `--clone` the way `snapshot` does — the
-release tag a CI job already has in hand, rather than a `git rev-parse` of
-its own.
+Attachments cite the `entity/version` a run archived, so a release's assets
+hang off the release rather than off the git material it was built from.
+`--git-tag v1.0.0` names that version; `--commit <sha>`, `--ref` and
+`--git-branch` name the one the commit's own sha stands for, resolved in
+`--clone` the way `snapshot` does. A version no run has archived is refused,
+rather than brought into being by an attachment.
 
 `--type` becomes `source/git_<type>` — never a bare string, never parsed by
 `ranke-git` itself. With no path given, `attach` reads stdin, so a CI step

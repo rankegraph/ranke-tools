@@ -7,6 +7,21 @@ does not.
 
 ## Unreleased
 
+**`entity/version` — the tag or commit a run archived, as a thing in the
+world.** Every `snapshot` and `backup` now finds or builds one beside the
+repository and project entities: named by the tag where a tag was archived
+and by the commit's own sha otherwise, `derivation/input`-anchored to that
+commit and bound to its project by `relation/version_of`. It is also the only
+record a `snapshot` keeps of which tag it archived, that command capturing no
+refs.
+
+**An attachment cites the version, not the commit.** `relation/attached_to`
+points at the `entity/version`, so a release's assets hang off the release.
+`attach --git-tag v1.0.0` names it; `--commit`, `--ref` and `--git-branch`
+name the version the commit's own sha stands for. Attaching to a version no
+run has archived is refused rather than minting one. A scan still cites the
+commit, a scanner reading source rather than a release.
+
 ## v0.10.0 — 2026-09-10
 
 **A claim's height counts the contributor claim signing it.** `ranke-git`

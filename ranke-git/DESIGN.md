@@ -123,6 +123,27 @@ path back to a source (`D1`), satisfied once, at creation:
   no reified `relation/*` node; reification is for genuine n:n relations between
   entities (foundation paper §Relations).
 
+`entity/version` is the third: the tag a run archived, or the commit it archived
+where no tag named one — "widgets v1.0.0" as a thing in the world, as opposed to
+the `source/git_*` material evidencing it. Its fields are `version` (the tag, else
+the sha), `name` (the project's, since a version string is unique only within its
+project, which is what the find-or-build lookup matches on) and `git_sha`. It is
+`derivation/input`-anchored to the commit — the commit rather than its tree, the
+tree being one edge below it while the commit also carries the date, the message
+and the parent — and bound to its project by a `relation/version_of` edge, the same
+binary-fact-as-edge shape `hosted_in` uses.
+
+This is also how a snapshot records which tag it archived without keeping a ref:
+`snapshot` resolves a tag to a commit and captures no `source/git_ref`, so before
+this the tag name left no trace at all.
+
+An attachment cites the version, never the commit: a release's assets belong to
+the release, and the git material is what the version was built from. `attach`
+names it the way the archiving run did — `--git-tag v1.0.0` finds the version
+`v1.0.0`, and `--commit`/`--ref`/`--git-branch` find the one named by the commit's
+own sha. A scan still cites the commit through `derivation/input`, since a scanner
+reads source code rather than a release.
+
 ## Attachments
 
 `ranke-git attach` cites arbitrary content onto an already-archived commit — a

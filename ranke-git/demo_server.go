@@ -110,7 +110,7 @@ func runDemoServer(cmd *cobra.Command, o *options) error {
 		repo.secondSha, timeline.commit2At.Format(time.RFC3339), demoServerTag, demoServerTagLW)
 
 	fmt.Fprintf(out, ">> preparing — find or build %s/%s on %q\n", demoServerRepoURL, demoServerProject, demoServerBranch)
-	p, err := prepare(ctx, c, demoServerBranch, demoServerRepoURL, demoServerProject)
+	p, err := prepare(ctx, c, demoServerBranch, demoServerRepoURL, demoServerProject, demoServerTag)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,14 @@ func runDemoServer(cmd *cobra.Command, o *options) error {
 		return err
 	}
 
-	fmt.Fprintln(out, ">> attaching a build log to the tagged commit, as the CI pipeline")
+	fmt.Fprintf(out, ">> attaching a build log to version %s, as the CI pipeline\n", demoServerTag)
+	release, err := findVersion(ctx, c, demoServerBranch, demoServerProject, demoServerTag)
+	if err != nil {
+		return fmt.Errorf("demo server: %w", err)
+	}
+	if release == nil {
+		return fmt.Errorf("demo server: version %s not found right after archiving it", demoServerTag)
+	}
 	target, err := findOne(ctx, c, demoServerBranch, nodeCommit, gitShaField, repo.secondSha)
 	if err != nil {
 		return fmt.Errorf("demo server: %w", err)
@@ -147,7 +154,7 @@ func runDemoServer(cmd *cobra.Command, o *options) error {
 		contentType: "text/plain",
 		content:     []byte("demo-server build log\ncompiling...\nbuild succeeded\n"),
 	}
-	logClaim, err := buildAttachment(ctx, attachU, ci, ciSigner, *target, logAttachment, timeline.buildAt)
+	logClaim, err := buildAttachment(ctx, attachU, ci, ciSigner, *release, logAttachment, timeline.buildAt)
 	if err != nil {
 		return err
 	}

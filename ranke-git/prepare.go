@@ -17,7 +17,7 @@ import (
 // prepare finds or builds the repository and project entities and scans every git
 // object claim already on branch for content_hash reuse — query first, so
 // the build phase mints only what's actually new (-> DESIGN.md).
-func prepare(ctx context.Context, c *rankedb.Client, branch, repoURL, project string) (prep, error) {
+func prepare(ctx context.Context, c *rankedb.Client, branch, repoURL, project, version string) (prep, error) {
 	var p prep
 
 	repo, err := findOne(ctx, c, branch, nodeRepository, "url", repoURL)
@@ -31,6 +31,14 @@ func prepare(ctx context.Context, c *rankedb.Client, branch, repoURL, project st
 		return p, fmt.Errorf("prepare: project: %w", err)
 	}
 	p.project = proj
+
+	if version != "" {
+		found, err := findVersion(ctx, c, branch, project, version)
+		if err != nil {
+			return p, fmt.Errorf("prepare: version: %w", err)
+		}
+		p.version = found
+	}
 
 	hashes, err := scanContentHashes(ctx, c, branch)
 	if err != nil {
@@ -59,6 +67,29 @@ func findOne(ctx context.Context, c *rankedb.Client, branch, typ, field, value s
 	}
 	if len(claims) > 1 {
 		return nil, fmt.Errorf("%d %s claims have %s=%q, want at most one", len(claims), typ, field, value)
+	}
+	return &reused{id: claims[0].ID(), height: claims[0].Node().Height()}, nil
+}
+
+// findVersion looks up the entity/version a project holds under one name —
+// a version string is only unique within its project, so both are matched.
+func findVersion(ctx context.Context, c *rankedb.Client, branch, project, version string) (*reused, error) {
+	claims, err := queryClaims(ctx, c, ranke.Query{
+		Select: ranke.Select{Branch: branch},
+		Where: &ranke.Where{And: []ranke.Where{
+			{Field: "type", Test: &ranke.Comparison{Eq: nodeVersion}},
+			{Field: versionNameField, Test: &ranke.Comparison{Eq: version}},
+			{Field: projectField, Test: &ranke.Comparison{Eq: project}},
+		}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(claims) == 0 {
+		return nil, nil
+	}
+	if len(claims) > 1 {
+		return nil, fmt.Errorf("%d %s claims are %q of project %q, want at most one", len(claims), nodeVersion, version, project)
 	}
 	return &reused{id: claims[0].ID(), height: claims[0].Node().Height()}, nil
 }
