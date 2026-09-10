@@ -17,6 +17,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rankedb "github.com/rankegraph/ranke-db/client"
 	"github.com/rankegraph/ranke-go"
 )
 
@@ -80,8 +81,11 @@ func runDemoServer(cmd *cobra.Command, o *options) error {
 	out := cmd.OutOrStdout()
 
 	fmt.Fprintf(out, ">> looking for a ranke-db at %s ...\n", addr)
-	c := newClient(addr, o.token, o.apiKey)
-	if err := c.waitReady(ctx, 2*time.Second); err != nil {
+	c, err := dial(addr, o)
+	if err != nil {
+		return err
+	}
+	if err := c.WaitReady(ctx, 2*time.Second); err != nil {
 		return fmt.Errorf("no ranke-db found at %s — start one first, from another shell:\n\n  server/run.sh\n\nthen run this again", addr)
 	}
 	fmt.Fprintln(out, ">> found it")
@@ -188,7 +192,7 @@ type demoServerScanResult struct {
 // demoServerScan finds or builds each demoServerCVE finding — scan.go's own loop,
 // split out here so runDemoServer stays about orchestration.
 func demoServerScan(
-	ctx context.Context, c *client, contributor ranke.Contributor, signer crypto.Signer, target *reused, at time.Time,
+	ctx context.Context, c *rankedb.Client, contributor ranke.Contributor, signer crypto.Signer, target *reused, at time.Time,
 ) (demoServerScanResult, []byte, error) {
 	var out demoServerScanResult
 	out.height = target.height
@@ -293,7 +297,7 @@ func demoServerRepo(timeline demoServerTimeline) (demoServerRepoResult, error) {
 // bootstrapContributor mints an identity and contributes its root claim
 // before binding it — demoIdentity (demo.go) never keeps that unbound claim.
 // A zero at defaults to now.
-func bootstrapContributor(ctx context.Context, c *client, branch string, at time.Time) (ranke.Contributor, crypto.Signer, error) {
+func bootstrapContributor(ctx context.Context, c *rankedb.Client, branch string, at time.Time) (ranke.Contributor, crypto.Signer, error) {
 	if at.IsZero() {
 		at = time.Now().UTC()
 	}
@@ -313,10 +317,10 @@ func bootstrapContributor(ctx context.Context, c *client, branch string, at time
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := c.advanceClock(ctx, at); err != nil {
+	if _, err := c.Dev().AdvanceClock(ctx, at); err != nil {
 		return nil, nil, err
 	}
-	if _, err := c.contribute(ctx, ranke.NewMemoryUniverse(), branch, []ranke.Claim{claim}); err != nil {
+	if _, err := c.Contribute(ctx, ranke.NewMemoryUniverse(), branch, []ranke.Claim{claim}, rankedb.Creating()); err != nil {
 		return nil, nil, fmt.Errorf("register contributor: %w", err)
 	}
 	self, err := claim.AsContributor(ctx, nil, priv)

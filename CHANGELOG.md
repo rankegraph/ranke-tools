@@ -7,6 +7,20 @@ does not.
 
 ## Unreleased
 
+**`ranke-git` sends through `ranke-db/client`, the official Go client.** The
+REST transport this repository wrote for itself is gone: `Query`/`QueryClaims`,
+`GetClaim`, `Contribute` (which gathers external content from the Universe
+itself) and `Dev().AdvanceClockPast` replace it, and a refusal now arrives as
+a `*client.Error` matching `errors.Is(err, client.ErrNotFound)` and its
+siblings. The build requires `github.com/rankegraph/ranke-db` as a result,
+pinned like any other dependency; nothing of the server beyond its published
+client is reachable from here.
+
+**The dev server pin moves to `ranke-db` v1.24.0**, the release the client
+ships in, so client and server move together on one `make upgrade`.
+
+**ranke-go moves to v0.32.0.**
+
 ## v0.6.0 — 2026-09-10
 
 **`--signing-key` reads the key from wherever the platform keeps it.** A bare
@@ -21,8 +35,8 @@ one — `identity register` has always written `0600` — and a PEM handed over
 where a source belongs is rejected as compromised, having reached the process
 table, the shell history and any CI log. Both rules come from `keysource`.
 
-**ranke-go moves to v0.31.0**, whose `keysource` package and `Parse*` key
-readers replace the PEM loading `ranke-git` had written for itself.
+**ranke-go's `keysource` package and `Parse*` key readers** replace the PEM
+loading `ranke-git` had written for itself.
 
 ## v0.5.0 — 2026-09-10
 

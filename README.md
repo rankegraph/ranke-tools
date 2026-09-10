@@ -1,13 +1,16 @@
 # ranke-tools
 
 A home for standalone tools that write to a running `ranke-db` instance as ordinary
-clients — each its own contributor, over the documented REST API, depending only on
-`github.com/rankegraph/ranke-go` to build and sign its claims. Never a sibling path,
-never a `replace`, never anything from `ranke-db`'s own module: every tool here is an
-external consumer of the public contract, on purpose — that's what makes a breaking
-change in `ranke-go` or the REST API show up here as a real, independently-noticed
-failure, not something that quietly stays in lockstep because it was developed in the
-same repo.
+clients — each its own contributor, over the documented REST API. Claims are built
+and signed with `github.com/rankegraph/ranke-go`, and sent with
+`github.com/rankegraph/ranke-db/client`, the official Go client that lives beside
+the OpenAPI contract it is generated from.
+
+Every tool here is an external consumer of that contract, at a pinned version, by a
+released binary and never a sibling path or a `replace`. What proves it still holds
+is the live test: `ranke-git`'s own suite starts the pinned `ranke-db` release and
+drives it over HTTP, so a version that no longer answers fails a test here rather
+than in production.
 
 One Go module, one subdirectory per tool.
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rankedb "github.com/rankegraph/ranke-db/client"
 	"github.com/rankegraph/ranke-go"
 )
 
@@ -134,7 +135,7 @@ func runScan(cmd *cobra.Command, o *options, commitSha string, cves []string, co
 // repository()/project() use (convert.go), invoked here instead of the walk.
 // A zero at defaults to now.
 func findOrBuildCVE(
-	ctx context.Context, c *client, branch string, contributor ranke.Contributor, signer crypto.Signer,
+	ctx context.Context, c *rankedb.Client, branch string, contributor ranke.Contributor, signer crypto.Signer,
 	target *reused, f cveFinding, at time.Time,
 ) (reused, ranke.Claim, error) {
 	if at.IsZero() {
