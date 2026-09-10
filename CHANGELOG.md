@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.7.0 — 2026-09-10
+
 **`ranke-git` sends through `ranke-db/client`, the official Go client.** The
 REST transport this repository wrote for itself is gone: `Query`/`QueryClaims`,
 `GetClaim`, `Contribute` (which gathers external content from the Universe
