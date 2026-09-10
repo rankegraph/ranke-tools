@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.8.0 — 2026-09-10
+
 **`ranke-git identity register` is gone.** `ranke-client`, the CLI `ranke-db`
 ships, provisions contributors: `branch create` contributes the contributor
 claim a branch is written under, `contributor list` reports what an archive
