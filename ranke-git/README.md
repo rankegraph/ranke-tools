@@ -1,9 +1,10 @@
 # ranke-git
 
 Archives git state into a running `ranke-db`, byte-exact and content-deduplicated —
-so a force-push or a squash can never erase what it already captured. A pure REST
-client: it never starts a server itself, never touches `ranke-db`'s own module, only
-`github.com/rankegraph/ranke-go` to build and sign claims.
+so a force-push or a squash can never erase what it already captured. A REST client
+and nothing more: it never starts a server itself, builds and signs its claims with
+`github.com/rankegraph/ranke-go`, and sends them through `ranke-db/client`, the
+official Go client for a running instance.
 
 For the design decisions behind these shapes — why `path` sits where it does, why
 `entity/cve` is unprefixed, the whole claim/edge layout — see [DESIGN.md](./DESIGN.md).

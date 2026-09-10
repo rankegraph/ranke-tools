@@ -18,6 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rankedb "github.com/rankegraph/ranke-db/client"
 	"github.com/rankegraph/ranke-go"
 	"github.com/rankegraph/ranke-go/keysource"
 )
@@ -39,8 +40,12 @@ func loadSigningKey(source string) (ed25519.PrivateKey, error) {
 
 // loadContributor fetches and binds the contributor claim id names, whether
 // --contributor-id gave it or the signing key found it.
-func loadContributor(ctx context.Context, c *client, branch, id string, key ed25519.PrivateKey) (ranke.Contributor, error) {
-	claim, err := c.getClaim(ctx, branch, id)
+func loadContributor(ctx context.Context, c *rankedb.Client, branch, id string, key ed25519.PrivateKey) (ranke.Contributor, error) {
+	parsed, err := ranke.ParseId(id)
+	if err != nil {
+		return nil, fmt.Errorf("contributor id %q: %w", id, err)
+	}
+	claim, err := c.GetClaim(ctx, rankedb.Scope(branch), parsed)
 	if err != nil {
 		return nil, fmt.Errorf("load contributor %s: %w", id, err)
 	}
@@ -78,33 +83,30 @@ func missingRef(ref string) error {
 	return fmt.Errorf("%q names no tag, branch, or commit in this clone", ref)
 }
 
-// contributorIDForKey finds the contributor on branch carrying the signing
-// key's pubkey. A lookup, never a mint (-> DESIGN.md).
-func contributorIDForKey(ctx context.Context, c *client, branch string, key ed25519.PrivateKey) (string, error) {
+// contributorIDForKey finds the contributor carrying the signing key's
+// pubkey. A lookup, never a mint (-> DESIGN.md).
+func contributorIDForKey(ctx context.Context, c *rankedb.Client, branch string, key ed25519.PrivateKey) (string, error) {
 	pubkey, err := ranke.EncodePublicKey(key.Public())
 	if err != nil {
 		return "", fmt.Errorf("encode public key: %w", err)
 	}
-	recs, err := c.query(ctx, ranke.Query{
+	// Each contributor claim carries its pubkey inline, so the match needs no
+	// further fetch. No index runs from a pubkey to the claim holding it.
+	all, err := queryClaims(ctx, c, ranke.Query{
 		Select: ranke.Select{Branch: branch},
 		Where:  &ranke.Where{Field: "type", Test: &ranke.Comparison{Eq: ranke.NodeTypeContributor}},
-		Output: ranke.Output{Detail: ranke.DetailClaims, Encoding: ranke.ResultJSON},
 	})
 	if err != nil {
 		return "", fmt.Errorf("find contributor: %w", err)
 	}
 	var found []string
-	for _, rec := range recs {
-		claim, err := c.getClaim(ctx, branch, rec.ID)
-		if err != nil {
-			return "", fmt.Errorf("find contributor: read %s: %w", rec.ID, err)
-		}
+	for _, claim := range all {
 		self, err := claim.AsContributor(ctx, nil)
 		if err != nil {
 			continue
 		}
 		if bytes.Equal(self.Pubkey(), pubkey) {
-			found = append(found, rec.ID)
+			found = append(found, claim.ID().String())
 		}
 	}
 	switch len(found) {
@@ -118,10 +120,27 @@ func contributorIDForKey(ctx context.Context, c *client, branch string, key ed25
 	return "", fmt.Errorf("%d contributors on branch %q carry this key (%s) — name the one to sign as with --contributor-id", len(found), branch, strings.Join(found, ", "))
 }
 
+// dial points a client at addr, presenting at most one credential — the
+// endpoint routes on the scheme it is given, and refuses two as ambiguous.
+func dial(addr string, o *options) (*rankedb.Client, error) {
+	var opts []rankedb.Option
+	switch {
+	case o.token != "":
+		opts = append(opts, rankedb.WithToken(o.token))
+	case o.apiKey != "":
+		opts = append(opts, rankedb.WithAPIKey(o.apiKey))
+	}
+	c, err := rankedb.New(addr, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", addr, err)
+	}
+	return c, nil
+}
+
 // session is what every action needs before it does its own work: a live
 // client and a bound contributor to sign as.
 type session struct {
-	client      *client
+	client      *rankedb.Client
 	contributor ranke.Contributor
 	signer      crypto.Signer
 }
@@ -139,8 +158,11 @@ func connect(ctx context.Context, o *options) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := newClient(o.server, o.token, o.apiKey)
-	if err := c.waitReady(ctx, 10*time.Second); err != nil {
+	c, err := dial(o.server, o)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.WaitReady(ctx, 10*time.Second); err != nil {
 		return nil, fmt.Errorf("%s: %w", o.server, err)
 	}
 	id := o.contributorID
@@ -156,30 +178,14 @@ func connect(ctx context.Context, o *options) (*session, error) {
 	return &session{client: c, contributor: contributor, signer: key}, nil
 }
 
-// maxCreatedAt is the latest created_at among claims — what the dev
-// sequencer's clock must reach before this batch can land, exactly, not a
-// fixed offset from whenever the run happens to execute.
-func maxCreatedAt(claims []ranke.Claim) time.Time {
-	var at time.Time
-	for _, c := range claims {
-		if t := c.Node().CreatedAt(); t.After(at) {
-			at = t
-		}
-	}
-	return at
-}
-
-// contributeAndReport advances the dev clock, merges claims, and prints what
-// landed. u is where an externally-content claim's bytes come from.
-func contributeAndReport(ctx context.Context, c *client, u ranke.Universe, branch string, claims []ranke.Claim, out io.Writer) error {
-	at := maxCreatedAt(claims)
-	if at.IsZero() {
-		at = time.Now().UTC()
-	}
-	if err := c.advanceClock(ctx, at); err != nil {
+// contributeAndReport advances a dev server's clock past the batch, merges
+// the claims, and prints what landed. u is where an externally-content
+// claim's bytes come from.
+func contributeAndReport(ctx context.Context, c *rankedb.Client, u ranke.Universe, branch string, claims []ranke.Claim, out io.Writer) error {
+	if _, err := c.Dev().AdvanceClockPast(ctx, claims); err != nil {
 		return err
 	}
-	res, err := c.contribute(ctx, u, branch, claims)
+	res, err := c.Contribute(ctx, u, branch, claims, rankedb.Creating())
 	if err != nil {
 		return err
 	}

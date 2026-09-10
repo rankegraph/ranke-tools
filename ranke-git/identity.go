@@ -18,6 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rankedb "github.com/rankegraph/ranke-db/client"
 	"github.com/rankegraph/ranke-go"
 )
 
@@ -57,8 +58,11 @@ func runIdentityRegister(cmd *cobra.Command, o *options, out string) error {
 	if _, err := os.Stat(out); err == nil {
 		return fmt.Errorf("identity register: %s already exists — won't overwrite a signing key", out)
 	}
-	c := newClient(o.server, o.token, o.apiKey)
-	if err := c.waitReady(ctx, 10*time.Second); err != nil {
+	c, err := dial(o.server, o)
+	if err != nil {
+		return err
+	}
+	if err := c.WaitReady(ctx, 10*time.Second); err != nil {
 		return fmt.Errorf("%s: %w", o.server, err)
 	}
 
@@ -79,10 +83,10 @@ func runIdentityRegister(cmd *cobra.Command, o *options, out string) error {
 	if err != nil {
 		return err
 	}
-	if err := c.advanceClock(ctx, at); err != nil {
+	if _, err := c.Dev().AdvanceClock(ctx, at); err != nil {
 		return err
 	}
-	if _, err := c.contribute(ctx, ranke.NewMemoryUniverse(), o.branch, []ranke.Claim{claim}); err != nil {
+	if _, err := c.Contribute(ctx, ranke.NewMemoryUniverse(), o.branch, []ranke.Claim{claim}, rankedb.Creating()); err != nil {
 		return fmt.Errorf("identity register: %w", err)
 	}
 

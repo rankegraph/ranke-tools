@@ -1,8 +1,8 @@
 // package: main / ranke-git
 // type:    entrypoint
 // job:     the ranke-git binary — archives git state into a running ranke-db as a client
-// limits:  a client only, over the documented REST contract; no dependency on ranke-db
-// itself, only on ranke-go (-> DESIGN.md)
+// limits:  a client only, over the documented REST contract — ranke-go for the claims,
+// ranke-db/client for the transport, nothing of the server itself (-> DESIGN.md)
 package main
 
 import (

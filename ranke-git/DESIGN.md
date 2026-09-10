@@ -291,14 +291,30 @@ switched on, one real commit at a time, dated today (no historical backfill, so 
 `V-MONO` risk from non-monotonic git history). Not yet built: the actual CI
 workflow wiring, and a real, persistently-deployed `ranke-db` to point it at.
 
+## Talking to a server
+
+`ranke-db/client` is the transport, the official Go client generated from the
+same `openapi.yaml` the server implements. `ranke-git` wrote its own for a
+while, on the reasoning that hand-written HTTP kept this repository an
+independent check on the REST contract. It did not: a hand-written client
+tests one reading of the contract, frozen on the day it was written, and
+nothing here failed when the two drifted. The check that does hold is
+`demo_server_test.go`, which starts the pinned `ranke-db` release and drives
+it over real HTTP — unaffected by whose client sits underneath, and the reason
+the pin and the client version move together (`make upgrade`).
+
+What stays out is the server itself: its adapters, its config, its storage.
+`go list -deps` over the client reaches the generated OpenAPI layer and what
+ranke-go already brings, and nothing else.
+
 ## Sending content
 
 `WriteClaim` carries only a claim's own record — for external content that's
-just `content_hash`/`content_size`, never the bytes. `client.contribute`
-separately calls `WriteContent` for every externally-content claim in the
-batch (deduped by hash within the batch itself, so a blob two claims share
-goes out once), reading the bytes back from the same Universe the build phase
-wrote them into. Missing this was a real, confirmed bug for a while: the
+just `content_hash`/`content_size`, never the bytes. `Client.Contribute`
+gathers the content itself, reading each externally-content claim's bytes back
+from the Universe the build phase wrote them into and deduping by hash within
+the batch, so a blob two claims share goes out once. Missing this was a real,
+confirmed bug in this repository's own client for a while: the
 claim records reached the server and even satisfied re-run dedup (which only
 ever reads the `content_hash` *field*, never fetches the bytes it names), so
 everything *looked* correct while every blob's actual content was silently
