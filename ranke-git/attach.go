@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / attach
 // type:    logic + entrypoint
 // job:     `ranke-git attach` — cites arbitrary content (a log, a report, an artifact) onto
 // an already-archived commit

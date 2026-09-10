@@ -16,10 +16,10 @@ import (
 	"github.com/rankegraph/ranke-go"
 )
 
-// testIdentity mints a throwaway root contributor claim and its signing key — a
-// fresh identity per test run, never an application's, and never persisted
+// testContributor mints a throwaway root contributor claim and its signing key
+// — a fresh one per test run, never an application's, and never persisted
 // anywhere beyond this process.
-func testIdentity(t *testing.T) (ranke.Contributor, crypto.Signer) {
+func testContributor(t *testing.T) (ranke.Contributor, crypto.Signer) {
 	t.Helper()
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -44,7 +44,7 @@ func testIdentity(t *testing.T) (ranke.Contributor, crypto.Signer) {
 	return self, priv
 }
 
-// initRepo creates a git repo at dir with a deterministic identity, so the test
+// initRepo creates a git repo at dir with a fixed git author, so the test
 // depends on nothing from the environment it runs in.
 func initRepo(t *testing.T, dir string) gitRepo {
 	t.Helper()
@@ -196,7 +196,7 @@ func TestRoundTripIsByteExact(t *testing.T) {
 	writeSymlink(t, src, "link-to-readme", "README.md")
 	origSha := commitAll(t, g, "first commit")
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	ctx := context.Background()
 
@@ -314,7 +314,7 @@ func TestRoundTripDedupesRepeatedBlobs(t *testing.T) {
 	writeFile(t, src, "b.txt", []byte("same content\n"), 0o644)
 	sha := commitAll(t, g, "duplicate blobs")
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
@@ -357,7 +357,7 @@ func TestSubmoduleIsRefused(t *testing.T) {
 		t.Fatalf("rev-parse HEAD: %v", err)
 	}
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	_, err = gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err == nil {
@@ -405,7 +405,7 @@ func TestBackupRoundTripIsByteExact(t *testing.T) {
 		{kind: "tag", name: "v1.0"},
 		{kind: "tag", name: "v1.0-lw"},
 	}
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	ctx := context.Background()
 	claims, err := backupToClaims(ctx, g, refs, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
@@ -474,7 +474,7 @@ func TestScopedCapture(t *testing.T) {
 		t.Fatalf("rev-parse v1: %v", err)
 	}
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	ctx := context.Background()
 	claims, err := gitToClaims(ctx, g, "v1", []string{"services/api"}, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
@@ -519,7 +519,7 @@ func TestScopedCaptureRefusesAnUnreachedPath(t *testing.T) {
 	writeFile(t, src, "README.md", []byte("hi\n"), 0o644)
 	sha := commitAll(t, g, "one file")
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	_, err := gitToClaims(context.Background(), g, sha, []string{"does/not/exist"}, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err == nil {

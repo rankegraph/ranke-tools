@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / prepare
 // type:    logic
 // job:     the preparational phase — find or build the repository/project entities and scan
 // existing content_hash values, before the build phase mints anything new

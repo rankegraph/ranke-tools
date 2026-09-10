@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / scan
 // type:    logic + entrypoint
 // job:     `ranke-git scan` — records a vulnerability scan's findings against an already-
 // archived commit: find or build entity/cve per finding, one derivation/vulnerability_scan

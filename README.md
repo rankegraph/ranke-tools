@@ -22,8 +22,8 @@ tool's own manual for what that version actually does.
 - [`ranke-git`](./ranke-git/README.md) — archives an exact git tree (or a repo's
   full history) into a Ranke-Graph archive, byte-exact and content-deduplicated,
   attaches arbitrary content (build logs, artifacts, reports) onto an archived
-  commit, records vulnerability scan findings, and provisions the contributor
-  identities all of that signs as.
+  commit, and records vulnerability scan findings — signing as a contributor
+  `ranke-client` provisioned.
 
 More tools are coming soon.
 

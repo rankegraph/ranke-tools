@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / gitobj
 // type:    io
 // job:     byte-exact access to one git repo's objects, via the git binary itself
 // limits:  reads/writes raw object payloads and structure; means nothing about claims (-> convert.go)

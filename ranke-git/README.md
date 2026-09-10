@@ -19,14 +19,19 @@ Or build from a checkout: `make -C .. build` (repo root), producing `bin/ranke-g
 
 ## Quickstart
 
-Every command needs a server, an already-registered contributor, and (for
+Every command needs a server, a contributor to sign as, and (for
 `snapshot`/`backup`) a checkout to read. `--repo` defaults to that checkout's
 `origin`, and the project to the repo URL's last segment, so a CI job that
 checked the repo out already names both: `--project` is for a monorepo, where
 one repo holds several. Mint a contributor once:
 
+A contributor and the branch it writes to come from `ranke-client`, the CLI
+`ranke-db` ships — `ranke-git` signs as one, and provisions none:
+
 ```sh
-ranke-git identity register --server https://ranke-db.example.com --out contributor.pem
+openssl genpkey -algorithm ed25519 -out contributor.pem
+ranke-client branch create main --signing-key contributor.pem \
+  --server https://ranke-db.example.com
 ```
 
 Then archive a commit:
@@ -39,16 +44,16 @@ ranke-git snapshot \
 # contributor: the one carrying this key · repo: the clone's origin · project: widgets
 ```
 
-The key names the identity: `ranke-git` reads the branch's contributors and
-signs as the one whose public key matches. `--contributor-id` picks between
-them where one key was registered twice, two identities carrying different
-provenance.
+The key names the contributor: `ranke-git` reads the branch's contributors
+and signs as the one whose public key matches. `--contributor-id` picks
+between them where one key was registered twice, two contributors carrying
+different provenance.
 
 ### Where the signing key comes from
 
-`--signing-key` takes a path, or one of the spellings `ranke-go`'s
-[`keysource`](https://github.com/rankegraph/ranke-go) grammar defines, which
-every app on the library shares:
+`--signing-key` is resolved by `ranke-client`'s own `contributor.Load`, over
+`ranke-go`'s `keysource` grammar — one spelling of a key source across every
+tool built on `ranke-db`:
 
 | Source | For |
 | --- | --- |
@@ -58,7 +63,7 @@ every app on the library shares:
 | `prompt` | a person, pasting it and ending with a blank line |
 
 Two refusals come with the grammar. A key file anybody but its owner can read
-is rejected, the way `ssh` rejects one, and `identity register` writes `0600`.
+is rejected, the way `ssh` rejects one, so `chmod 600` a key you mint yourself.
 Key material passed where a source belongs — the PEM itself, rather than a
 path or `env:NAME` — is rejected as compromised, because by then it has
 reached the process table, the shell history and any CI log; rotate that key.
@@ -81,7 +86,7 @@ every flag by hand — a flag given on the command line still wins over what's i
 
 ## Commands
 
-Global flags (`--server`, `--token`/`--api-key`, `--contributor-id`, `--signing-key`,
+Global flags (`--server`, `--token`/`--api-key`/`--macaroon`, `--contributor-id`, `--signing-key`,
 `--repo`, `--clone`, `--project`, `--branch`, `--path`, `--config`) are shared by every
 command below; see `ranke-git --help` for their full descriptions.
 
@@ -168,19 +173,6 @@ ranke-git scan --commit <sha> \
 ```
 
 `--file` is optional — a bare link with no archived scanner output is legitimate.
-
-### `identity register` — provision a real contributor
-
-Mints an ed25519 keypair, contributes its root claim, and writes the signing key to
-disk — the one-time bootstrap a real, persistent identity needs (a CI pipeline's
-own, say). Refuses to overwrite an existing `--out`.
-
-```sh
-ranke-git identity register --server <server> --out contributor.pem
-```
-
-Store the written key safely (a CI secret store, a vault) — this command's job ends
-at "the identity now exists and here is its key."
 
 ### `demo local` / `demo server` — see it work
 

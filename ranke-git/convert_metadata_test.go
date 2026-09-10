@@ -20,7 +20,7 @@ func TestBlobAndEntryPathFields(t *testing.T) {
 	writeFile(t, src, "pkg/sub/b.go", []byte("package sub\n"), 0o644) // shares a.go's content
 	sha := commitAll(t, g, "path fields")
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
@@ -65,7 +65,7 @@ func TestVersionFieldOnlyOnCommit(t *testing.T) {
 	writeFile(t, src, "a.txt", []byte("content\n"), 0o644)
 	sha := commitAll(t, g, "version field")
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
@@ -97,7 +97,7 @@ func TestDatedOnCommitAndBlob(t *testing.T) {
 		t.Fatalf("commitAuthorDate: %v", err)
 	}
 
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {

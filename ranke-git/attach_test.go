@@ -46,7 +46,7 @@ func TestSubtypeCharsMatchesChecksubtype(t *testing.T) {
 // locally: namespaced type, the name field, the declared encoding, and a
 // relation/attached_to edge pointing at the target with RelationTo.
 func TestBuildAttachmentShape(t *testing.T) {
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	ctx := context.Background()
 	u := ranke.NewMemoryUniverse()
 
@@ -139,7 +139,7 @@ func TestVerifiedChecksum(t *testing.T) {
 func TestAttachmentChecksumField(t *testing.T) {
 	ctx := context.Background()
 	u := ranke.NewMemoryUniverse()
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	targetID, err := ranke.HashContent([]byte("target"))
 	if err != nil {
 		t.Fatalf("HashContent: %v", err)

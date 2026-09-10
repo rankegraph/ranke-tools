@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / demo_server
 // type:    entrypoint
 // job:     `ranke-git demo server` — the same story as `demo local`, but genuinely over the
 // network: find or build entities, reuse, attach, against a real ranke-db
@@ -9,8 +9,6 @@ package main
 import (
 	"context"
 	"crypto"
-	"crypto/ed25519"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"time"
@@ -69,7 +67,7 @@ func newDemoServerTimeline() demoServerTimeline {
 
 // runDemoServer checks for a server, refusing to start one itself, then
 // backs up a small tagged repo, attaches a build log, and records a scan —
-// DESIGN.md's driving use cases, run for real. Two identities sign it: a CI
+// DESIGN.md's driving use cases, run for real. Two contributors sign it: a CI
 // pipeline attests the archive and log, a scanner attests the scan and its
 // CVEs — a signature is who attested a claim, so one actor per real role.
 func runDemoServer(cmd *cobra.Command, o *options) error {
@@ -92,11 +90,11 @@ func runDemoServer(cmd *cobra.Command, o *options) error {
 
 	timeline := newDemoServerTimeline()
 	fmt.Fprintln(out, ">> minting two throwaway contributors — a CI pipeline and a security scanner — and registering them")
-	ci, ciSigner, err := bootstrapContributor(ctx, c, demoServerBranch, timeline.registerAt)
+	ci, ciSigner, err := bootstrapContributor(ctx, c, demoServerBranch)
 	if err != nil {
 		return err
 	}
-	scanner, scannerSigner, err := bootstrapContributor(ctx, c, demoServerBranch, timeline.registerAt)
+	scanner, scannerSigner, err := bootstrapContributor(ctx, c, demoServerBranch)
 	if err != nil {
 		return err
 	}
@@ -294,38 +292,16 @@ func demoServerRepo(timeline demoServerTimeline) (demoServerRepoResult, error) {
 	return result, nil
 }
 
-// bootstrapContributor mints an identity and contributes its root claim
-// before binding it — demoIdentity (demo.go) never keeps that unbound claim.
+// bootstrapContributor mints a contributor and registers it, where
+// demoContributor (demo.go) keeps its claim to itself.
 // A zero at defaults to now.
-func bootstrapContributor(ctx context.Context, c *rankedb.Client, branch string, at time.Time) (ranke.Contributor, crypto.Signer, error) {
-	if at.IsZero() {
-		at = time.Now().UTC()
-	}
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+func bootstrapContributor(ctx context.Context, c *rankedb.Client, branch string) (ranke.Contributor, crypto.Signer, error) {
+	self, priv, err := mintContributor()
 	if err != nil {
 		return nil, nil, err
 	}
-	encoded, err := ranke.EncodePublicKey(pub)
-	if err != nil {
-		return nil, nil, err
-	}
-	claim, err := ranke.NewClaim(ranke.NodeTypeContributor, nil).
-		WithInlineContent(encoded).
-		WithEncoding(ranke.EncodingOctetStream).
-		WithCreatedAt(at).
-		Sign(priv)
-	if err != nil {
-		return nil, nil, err
-	}
-	if _, err := c.Dev().AdvanceClock(ctx, at); err != nil {
-		return nil, nil, err
-	}
-	if _, err := c.Contribute(ctx, ranke.NewMemoryUniverse(), branch, []ranke.Claim{claim}, rankedb.Creating()); err != nil {
+	if _, err := contribute(ctx, c, ranke.NewMemoryUniverse(), branch, []ranke.Claim{self}); err != nil {
 		return nil, nil, fmt.Errorf("register contributor: %w", err)
-	}
-	self, err := claim.AsContributor(ctx, nil, priv)
-	if err != nil {
-		return nil, nil, err
 	}
 	return self, priv, nil
 }

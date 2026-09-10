@@ -212,7 +212,7 @@ application).
   source, unlike `attach`'s `relation/attached_to`) and each finding via one
   `relation/cve` edge per CVE — a claim can carry several edges of the same type to
   different targets, so N findings is just N edges, no reified node needed (a scan's
-  findings belong to that one scan, not an independent fact needing its own identity).
+  findings belong to that one scan, not an independent fact needing a claim of its own).
 - Content is optional: `--file` archives the scanner's raw output (external, same
   shape as everything else here) when given, entirely absent when not — `V-CONTENT`
   permits a claim with neither inline nor external content, confirmed against both
@@ -227,7 +227,7 @@ Built and verified live: `entity/cve` reused across separate `scan` runs and acr
 different findings sharing one CVE, and a contentless scan claim round-trips through
 a real contribute.
 
-## `demo server`'s timeline and identities
+## `demo server`'s timeline and contributors
 
 `ranke-git demo server` (demo_server.go) exists to show what the tool actually does
 against a live instance, so it stays honest to how a real release looks, not a
@@ -247,49 +247,24 @@ convenience shortcut:
   can carry a timestamp hours away from real now, the clock has to track the batch's
   own latest `created_at` exactly, not a fixed offset — a real fix for every command,
   not just the demo.
-- Two contributors sign it, not one: a CI-pipeline identity attests the archive and
-  its build log, a separate scanner identity attests the scan and its CVEs. A claim's
+- Two contributors sign it, not one: a CI pipeline attests the archive and its
+  build log, a separate scanner attests the scan and its CVEs. A claim's
   signature is who attested it, not access control, so one actor signing everything
   would misrepresent the story the graph tells.
 
-## Provisioning a real identity
+## Provisioning a contributor
 
-`ranke-git identity register` mints an ed25519 keypair, contributes its root claim,
-and writes the key to disk — the one-time bootstrap a real, persistent identity
-needs (a CI pipeline's own, say), as opposed to `demo server`'s throwaway
-self-registering one. It refuses to overwrite an existing `--out`, so a re-run never
-silently replaces a key something else already depends on. Storing the written key
-safely (a CI secret store, a vault) is the caller's job — this command's job ends at
-"a real identity now exists and here is its key." Verified live: the printed
-`--signing-key` works unmodified as input to a real `snapshot` call.
+`ranke-client`, the CLI `ranke-db` ships, mints and registers contributors:
+`branch create` contributes the contributor claim the branch is written under,
+`contributor list` reports what an archive holds. `ranke-git` had its own
+`identity register` for a while, from before that existed — one repository's
+guess at a shape the server now defines, and a second place for the rules to
+drift. It signs as a contributor and provisions none.
 
-`--signing-key` resolves through `keysource` in ranke-go, which holds the
-grammar — a path, `file:PATH`, `env:NAME`, `stdin`, `prompt` — for every app
-built on the library, so the rules cannot differ between them. `env:` is what
-CI wants: a runner is handed its secrets as environment, and a workflow that
-writes the PEM out first leaves the identity on a disk it does not own. The
-two refusals are upstream's too, and worth naming: a key file readable beyond
-its owner, on the ssh precedent, and key material passed where a source
-belongs, which is already in the process table and the CI log by the time it
-arrives. `ranke.ParseEd25519PrivateKeyPEM` then reads those bytes, the
-loading surface having taken a path and nothing else until ranke-go v0.31.0.
-
-The key is also what finds the identity again. `connect` reads the branch's
-`contribution/contributor` claims and signs as the one whose pubkey matches the
-key on disk, so a run carries one secret rather than a secret and an id that
-have to be kept together — `queries.ContributorsByKey` in ranke-go is the same
-lookup for a caller holding an `Archive`. A lookup only: an identity still comes
-into being through `identity register`, since minting one silently would put an
-unbound contributor into the graph on every typo. `--contributor-id` stays, for
-the case ranke-go names — nothing makes a pubkey unique, so one key registered
-twice is two identities with different provenance, and the run says so rather
-than picking one.
-
-The intended shape this unlocks: a CI step that runs `ranke-git snapshot` on every
-push, using a provisioned identity — the archive grows forward from whenever it's
-switched on, one real commit at a time, dated today (no historical backfill, so no
-`V-MONO` risk from non-monotonic git history). Not yet built: the actual CI
-workflow wiring, and a real, persistently-deployed `ranke-db` to point it at.
+The intended shape: a CI step runs `ranke-git snapshot` on every push, signing
+as a contributor provisioned once — the archive grows forward from whenever it
+is switched on, one real commit at a time, dated today (no historical
+backfill, so no `V-MONO` risk from non-monotonic git history).
 
 ## Talking to a server
 
@@ -303,9 +278,22 @@ nothing here failed when the two drifted. The check that does hold is
 it over real HTTP — unaffected by whose client sits underneath, and the reason
 the pin and the client version move together (`make upgrade`).
 
+`instance.Instance` addresses that server and `contributor.Load` reads the
+key, both from `ranke-client`'s own packages: they exist as packages because
+its verb packages need them, and a second tool needing the same two things is
+the case they already serve. A third credential comes with them, `--macaroon`.
+
 What stays out is the server itself: its adapters, its config, its storage.
 `go list -deps` over the client reaches the generated OpenAPI layer and what
 ranke-go already brings, and nothing else.
+
+The client also holds what a contributor claim is: `NewContributor` builds and
+signs it, `ContributorsFor` picks a key's own out of the claims a read
+returned. Each is a shape this repository had written for itself, three times
+over in the case of the claim. The read is scoped to the branch being written,
+since a branch holds its own contributor claim for a key (ranke-db v1.26.0) —
+`Client.Contributors` would answer archive-wide and want **R** on `$archive`,
+a right a least-privileged CI account has no reason to hold.
 
 ## Sending content
 
@@ -366,7 +354,7 @@ it, and the new commit — three claims, not the whole tree again.
   D1-anchored to a `derivation/build` citing the snapshot) is worth adding now or
   only once something actually needs to query artifacts as things across builds.
   `attach` covers "carry the bytes" today; it doesn't give an artifact its own
-  identity to reference from elsewhere.
+  claim of its own to reference from elsewhere.
 - Content-hash reuse across separate `attach` runs. Unlike `snapshot`/`backup`,
   `attach` never consults `prepare`'s `knownHashes` — attaching the same log
   twice mints two claims, not one reused. Likely fine (an attachment is tied to

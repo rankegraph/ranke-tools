@@ -7,6 +7,32 @@ does not.
 
 ## Unreleased
 
+**`ranke-git identity register` is gone.** `ranke-client`, the CLI `ranke-db`
+ships, provisions contributors: `branch create` contributes the contributor
+claim a branch is written under, `contributor list` reports what an archive
+holds. `ranke-git` signs as a contributor and provisions none. (*Identity* was
+no term of the graph's either; *contributor* is — "the actor, human, program,
+or agent, whose work brings a claim into the graph", per the glossary.)
+
+**`ranke-db` moves to v1.26.0**, client module and dev server binary both, and
+`make upgrade` now keeps the two in step: the module follows whatever release
+`server/.rankedb-version` pins, a client and its server having no business
+drifting apart.
+
+**`ranke-git` takes its instance wiring and key loading from `ranke-client`.**
+`instance.Instance` builds the client from `--server` and one credential, and
+`contributor.Load` resolves `--signing-key` through the same grammar — both
+packages exist so `ranke-client`'s verb packages can share them, and a second
+tool is the case they already serve. `--macaroon` comes with them, the third
+credential the endpoint routes on.
+
+**A contributor claim is built by `client.NewContributor`**, ranke-db's own
+shape for one, replacing the three copies `contributor register`, `demo
+server` and `demo local` each carried. `client.ContributorsFor` does the
+pubkey match that finds an existing contributor, over the branch being written
+rather than `$archive` — a branch holds its own contributor claim for a key as
+of ranke-db v1.26.0, so the narrower right suffices.
+
 ## v0.7.0 — 2026-09-10
 
 **`ranke-git` sends through `ranke-db/client`, the official Go client.** The

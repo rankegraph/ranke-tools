@@ -1,6 +1,6 @@
 //go:build linux
 
-// package: main / ranke-git
+// package: main (ranke-git) / sysprocattr_linux
 // type:    platform
 // job:     Pdeathsig for the live-server test — the kernel signals server/run.sh's child
 // the moment the forking thread exits, so a crashed test still stops it
