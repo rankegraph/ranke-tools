@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -43,6 +44,33 @@ func (g gitRepo) runEnv(env []string, args ...string) ([]byte, error) {
 // which is what lets one content strategy serve all three (-> DESIGN.md).
 func (g gitRepo) catFile(kind, sha string) ([]byte, error) {
 	return g.run("cat-file", kind, sha)
+}
+
+// originURL is the clone's own remote — what --repo names when it is left out.
+func (g gitRepo) originURL() (string, error) {
+	out, err := g.run("remote", "get-url", "origin")
+	if err != nil {
+		return "", err
+	}
+	return withoutCredentials(strings.TrimSpace(string(out))), nil
+}
+
+// withoutCredentials drops the userinfo a CI runner writes into the remote it
+// checks out with (https://gitlab-ci-token:<token>@host/…, or a bare PAT as
+// the user), which would otherwise reach the archive as the repository
+// entity's own url. Only over http(s): an ssh remote's user names the account
+// to log in as, and a restore reconfiguring origin needs it back.
+func withoutCredentials(remote string) string {
+	u, err := url.Parse(remote)
+	if err != nil || u.User == nil {
+		return remote
+	}
+	switch u.Scheme {
+	case "http", "https":
+		u.User = nil
+		return u.String()
+	}
+	return remote
 }
 
 // revParse resolves a ref (tag, branch, "HEAD") to its commit sha.

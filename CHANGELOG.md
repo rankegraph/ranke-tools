@@ -7,6 +7,50 @@ does not.
 
 ## Unreleased
 
+## v0.5.0 — 2026-09-10
+
+**`--signing-key` finds its own contributor.** `ranke-git` reads the branch's
+contributors and signs as the one carrying that key's public key, so
+`--contributor-id` is needed only where one key was registered twice. A key no
+contributor carries is refused, naming `identity register`; a key two
+contributors share is refused, naming both ids.
+
+**`ranke-git attach` names its commit by ref.** `--ref`, `--git-tag` and
+`--git-branch` resolve the target in `--clone`, so a release job attaches
+against the tag it already holds; `--commit <sha>` still works, and one of the
+two is required.
+
+**A ref that names nothing fails before the first network call**, saying which
+tag, branch or commit the clone lacks — and, for a tag or a branch, that a CI
+checkout fetches neither by default. `snapshot`, `backup` and `attach`
+resolved late and passed git's own "ambiguous argument … use '--' to separate
+paths from revisions" through.
+
+**`ranke-git attach` takes files and directories, and `--file` is gone.**
+Paths are positional now: `attach --type artifact assets` attaches every file
+under `assets/`, each its own claim named by its path within, contributed as
+one batch; a run with no path still reads stdin. `--name` titles a single
+attachment, and defaults to the file's own name. `--content-type` left out
+takes the file extension's type, or what the bytes look like, in place of the
+old `text/plain` default. Symlinks are skipped.
+
+**`ranke-git attach --checksum` records a published digest on the
+attachment.** It lands as the claim's `checksum` field in the form
+`<alg>:<hex>` — `sha256` where the algorithm is left out, `md5`, `sha1`,
+`sha256` or `sha512` where it is given — and the content is hashed first, so a
+mismatch refuses the attachment rather than signing an unchecked claim.
+`--checksum-file` reads the digest from a shasum-style file, and a sidecar
+inside an attached directory (`site.tar.gz.sha256` beside `site.tar.gz`) is
+folded into that artifact's field rather than attached on its own.
+
+**`ranke-git` takes `--repo` and `--project` from the checkout it reads.**
+`--repo` defaults to the clone's `origin`, and `--project` to the repo URL's
+last segment, so a CI job that has already checked the repository out passes
+neither. A URL carrying credentials, as some runners write into `origin`, is
+recorded without them; an ssh remote keeps its user, which a restore needs to
+reconfigure `origin`. Naming a monorepo's several projects is what `--project`
+is now for.
+
 ## v0.4.0 — 2026-09-10
 
 **`make upgrade` moves the `ranke-go` pin as well as the server's.** The module

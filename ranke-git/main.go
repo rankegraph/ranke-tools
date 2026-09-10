@@ -40,9 +40,9 @@ type options struct {
 	apiKey        string   // X-API-Key credential
 	contributorID string   // this worker's contributor claim id, already on the archive
 	signingKey    string   // path to the contributor's ed25519 private key (PEM)
-	repoURL       string   // the repo's remote URL; required even with --clone, to name the entity
+	repoURL       string   // the repo's remote URL, naming the entity; the clone's origin when unset
 	clone         string   // an existing local clone to read instead of cloning repoURL
-	project       string   // the project name — its own entity, distinct from the repo
+	project       string   // the project name — its own entity, distinct from the repo; derived from repoURL when unset
 	branch        string   // the ranke-db branch this run contributes onto
 	paths         []string // optional monorepo subset; empty archives the whole tree
 }
@@ -116,11 +116,11 @@ func rootCmd() *cobra.Command {
 	f.StringVar(&o.server, "server", "", "the ranke-db REST base URL (required)")
 	f.StringVar(&o.token, "token", "", "Authorization: Bearer credential")
 	f.StringVar(&o.apiKey, "api-key", "", "X-API-Key credential")
-	f.StringVar(&o.contributorID, "contributor-id", "", "this worker's contributor claim id (required)")
+	f.StringVar(&o.contributorID, "contributor-id", "", "this worker's contributor claim id (default: the one carrying --signing-key's public key)")
 	f.StringVar(&o.signingKey, "signing-key", "", "path to the contributor's ed25519 private key, PEM (required)")
-	f.StringVar(&o.repoURL, "repo", "", "the repo's remote URL — names the repo entity, required even with --clone")
+	f.StringVar(&o.repoURL, "repo", "", "the repo's remote URL — names the repo entity (default: the clone's origin)")
 	f.StringVar(&o.clone, "clone", "", "an existing local clone to read, instead of cloning --repo")
-	f.StringVar(&o.project, "project", "", "the project name — its own entity, distinct from the repo (required)")
+	f.StringVar(&o.project, "project", "", "the project name — its own entity, distinct from the repo (default: the repo URL's last segment)")
 	f.StringVar(&o.branch, "branch", "main", "the ranke-db branch this run contributes onto")
 	f.StringSliceVar(&o.paths, "path", nil, "restrict to this path within the repo (repeatable; monorepo subset)")
 	root.AddCommand(snapshotCmd(&o), backupCmd(&o), attachCmd(&o), scanCmd(&o), identityCmd(&o), demoCmd(&o))
@@ -135,7 +135,7 @@ func snapshotCmd(o *options) *cobra.Command {
 		Use:   "snapshot",
 		Short: "Archive one commit's tree, byte-exact — no history, no refs",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			target, err := snapshotTarget(ref, branch, tag)
+			target, err := refTarget(ref, branch, tag)
 			if err != nil {
 				return err
 			}
@@ -143,8 +143,14 @@ func snapshotCmd(o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Resolved here, so a ref that names nothing fails before the
+			// first network call rather than after the preparational phase.
+			sha, err := resolveRef(g, target)
+			if err != nil {
+				return err
+			}
 			return run(cmd, o, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
-				return gitToClaims(ctx, g, target, o.paths, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
+				return gitToClaims(ctx, g, sha, o.paths, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
 			})
 		},
 	}
@@ -154,11 +160,11 @@ func snapshotCmd(o *options) *cobra.Command {
 	return c
 }
 
-// snapshotTarget names the single commit a snapshot archives. --git-branch and
-// --git-tag are backup's flags, spelled the same here so one repo's tag reads
-// alike in both commands; each resolves under its own refs/ namespace, which
-// --ref leaves to git's resolution order.
-func snapshotTarget(ref, branch, tag string) (string, error) {
+// refTarget names the single commit a command works on. --git-branch and
+// --git-tag are backup's flags, spelled the same wherever one commit is
+// named; each resolves under its own refs/ namespace, which --ref leaves to
+// git's resolution order.
+func refTarget(ref, branch, tag string) (string, error) {
 	var given []string
 	for _, f := range []struct {
 		flag, value string
@@ -169,9 +175,9 @@ func snapshotTarget(ref, branch, tag string) (string, error) {
 	}
 	switch {
 	case len(given) == 0:
-		return "", fmt.Errorf("snapshot: one of --ref, --git-branch, or --git-tag is required")
+		return "", fmt.Errorf("one of --ref, --git-branch, or --git-tag is required")
 	case len(given) > 1:
-		return "", fmt.Errorf("snapshot: %s name a commit each — give one", strings.Join(given, " and "))
+		return "", fmt.Errorf("%s name a commit each — give one", strings.Join(given, " and "))
 	case branch != "":
 		return refSpec{kind: "branch", name: branch}.fullRef(), nil
 	case tag != "":
@@ -202,6 +208,11 @@ func backupCmd(o *options) *cobra.Command {
 			}
 			for _, t := range tags {
 				refs = append(refs, refSpec{kind: "tag", name: t})
+			}
+			for _, r := range refs {
+				if _, err := resolveRef(g, r.fullRef()); err != nil {
+					return err
+				}
 			}
 			return run(cmd, o, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
 				return backupToClaims(ctx, g, refs, u, contributor, signer, o.repoURL, o.project, p, time.Time{})

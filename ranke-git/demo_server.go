@@ -139,9 +139,13 @@ func runDemoServer(cmd *cobra.Command, o *options) error {
 		return fmt.Errorf("demo server: commit %s not found right after archiving it", repo.secondSha)
 	}
 	attachU := ranke.NewMemoryUniverse()
-	logClaim, err := buildAttachment(ctx, attachU, ci, ciSigner, *target,
-		"source/"+gitPrefix+"build_log", demoServerLogTitle, "text/plain",
-		[]byte("demo-server build log\ncompiling...\nbuild succeeded\n"), timeline.buildAt)
+	logAttachment := attachment{
+		typ:         "source/" + gitPrefix + "build_log",
+		name:        demoServerLogTitle,
+		contentType: "text/plain",
+		content:     []byte("demo-server build log\ncompiling...\nbuild succeeded\n"),
+	}
+	logClaim, err := buildAttachment(ctx, attachU, ci, ciSigner, *target, logAttachment, timeline.buildAt)
 	if err != nil {
 		return err
 	}
