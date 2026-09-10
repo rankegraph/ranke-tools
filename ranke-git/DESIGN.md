@@ -266,6 +266,18 @@ as a contributor provisioned once — the archive grows forward from whenever it
 is switched on, one real commit at a time, dated today (no historical
 backfill, so no `V-MONO` risk from non-monotonic git history).
 
+## Heights
+
+A claim carries one above the tallest it references, and its contributor
+claim is one of those (`V-HEIGHT`). `heightOver` (convert.go) is where that
+maximum is taken, so no builder here reads a height off its target alone: a
+key admitted to a branch by `ranke-client contributor add` holds a
+contributor claim above the one admitting it, and a claim signed under it
+builds fine with the old arithmetic and is then refused by the server, which
+re-derives the height. Verified live against ranke-db v1.27.1: a branch
+created under one key, a second key admitted to it, and snapshot, attach and
+scan all contributing under the second.
+
 ## Talking to a server
 
 `ranke-db/client` is the transport, the official Go client generated from the

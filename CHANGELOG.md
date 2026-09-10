@@ -7,6 +7,17 @@ does not.
 
 ## Unreleased
 
+**A claim's height counts the contributor claim signing it.** `ranke-git`
+read the height off its target alone — `target.height + 1` — which lands
+below a contributor whose own claim stands higher, and `V-HEIGHT` refuses
+that at verification. Every claim built here now carries one above the
+tallest it references, its contributor among them. A key admitted by
+`ranke-client contributor add` is that case: its contributor claim sits above
+the one admitting it, so nothing signed under such a key could be
+contributed at all before this.
+
+**`ranke-db` moves to v1.27.1**, client module and dev server binary both.
+
 ## v0.9.0 — 2026-09-10
 
 **`ranke-db` moves to v1.27.0**, client module and dev server binary both.

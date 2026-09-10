@@ -141,3 +141,22 @@ func mustFindByPath(t *testing.T, claims []ranke.Claim, path string) ranke.Claim
 	t.Fatalf("no tree entry edge with path %q", path)
 	return nil
 }
+
+// TestHeightOverCountsTheContributor pins V-HEIGHT's rule as ranke-db v1.27.1
+// states it: a claim sits above everything it references, its contributor
+// claim included, so a key admitted above the branch's creator lifts every
+// claim it signs.
+func TestHeightOverCountsTheContributor(t *testing.T) {
+	contributor, _ := testContributor(t)
+	own := contributor.Node().Height()
+
+	if got, want := heightOver(contributor), own+1; got != want {
+		t.Errorf("heightOver(contributor) = %d, want %d", got, want)
+	}
+	if got, want := heightOver(contributor, own+4), own+5; got != want {
+		t.Errorf("heightOver over a taller reference = %d, want %d", got, want)
+	}
+	if got := heightOver(contributor, 0); got <= own {
+		t.Errorf("heightOver over a shorter reference = %d, want it above the contributor's %d", got, own)
+	}
+}

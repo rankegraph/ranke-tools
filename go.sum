@@ -102,8 +102,8 @@ github.com/oasdiff/yaml3 v0.0.14/go.mod h1:csto2xfDjYccdUn/yw/bPjj/cYTdp6HtFA0J4
 github.com/openbao/openbao/api/v2 v2.6.0 h1:KvfspAaL9bab9hI8jFYkV2cgtSrwWtaG+k9AUTHWU4M=
 github.com/openbao/openbao/api/v2 v2.6.0/go.mod h1:H4IWiH+2rgF/TbrsUbsfrMyGoqojkLqxPCRLENSMnSo=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/rankegraph/ranke-db v1.27.0 h1:Kx+lEWYoLZ+FMjmbZdK8waUR/ADW58qDhkvfiDA4qTE=
-github.com/rankegraph/ranke-db v1.27.0/go.mod h1:d55F+3Dbi+Q7KCo+1rYLxOyaY7CFegVqVFRMuWWHeGs=
+github.com/rankegraph/ranke-db v1.27.1 h1:q40j08JBQNIUP1H5Q3o3t+FkJpfgJRqIyQymezLexsw=
+github.com/rankegraph/ranke-db v1.27.1/go.mod h1:d55F+3Dbi+Q7KCo+1rYLxOyaY7CFegVqVFRMuWWHeGs=
 github.com/rankegraph/ranke-go v0.32.0 h1:W//oeV2JHZnFBMEVnxbzmcHHhYlAf1P4gyRmZ3MuEe0=
 github.com/rankegraph/ranke-go v0.32.0/go.mod h1:nnyopbPjCiMlYoV5qUSFfBQ21oXwemtYrBu5NW2wffM=
 github.com/redis/go-redis/v9 v9.22.0 h1:laDvpYXTJtZLloinw1fA5Kqd6HAEH2XKxOkG/PDq2F0=

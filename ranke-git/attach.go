@@ -417,7 +417,7 @@ func buildAttachment(
 		WithEncoding(a.contentType).
 		WithField("name", a.name).
 		WithCreatedAt(at).
-		WithHeight(target.height + 1).
+		WithHeight(heightOver(contributor, target.height)).
 		WithEdges(edge)
 	if a.checksum != "" {
 		b = b.WithField("checksum", a.checksum)
