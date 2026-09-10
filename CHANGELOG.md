@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.6.0 — 2026-09-10
+
 **`--signing-key` reads the key from wherever the platform keeps it.** A bare
 path still works, and `file:PATH`, `env:NAME`, `stdin` and `prompt` join it.
 `env:` is the CI one: the runner is handed the PEM as environment and never
