@@ -7,6 +7,13 @@ does not.
 
 ## Unreleased
 
+**`ranke-db` moves to v1.27.0**, client module and dev server binary both.
+Finding the contributor a signing key holds is now `Client.ContributorsFor`,
+a method that reads one scope, where `ranke-git` had queried the branch and
+filtered the claims itself. A key no contributor on the branch carries is
+refused naming both ways one comes to be admitted: `ranke-client branch
+create`, and `ranke-client contributor add`, new in this release.
+
 ## v0.8.0 — 2026-09-10
 
 **`ranke-git identity register` is gone.** `ranke-client`, the CLI `ranke-db`

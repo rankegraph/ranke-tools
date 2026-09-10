@@ -115,22 +115,19 @@ func mintContributor() (ranke.Contributor, ed25519.PrivateKey, error) {
 // contributorIDForKey finds the contributor carrying the signing key's
 // pubkey. A lookup, never a mint (-> DESIGN.md).
 func contributorIDForKey(ctx context.Context, c *rankedb.Client, branch string, pubkey []byte) (string, error) {
-	// A branch holds its own contributor claim for a key (ranke-db v1.26), and
-	// reading it needs no R on $archive, which c.Contributors would.
-	all, err := queryClaims(ctx, c, ranke.Query{
-		Select: ranke.Select{Branch: branch},
-		Where:  &ranke.Where{Field: "type", Test: &ranke.Comparison{Eq: ranke.NodeContributor}},
-	})
+	// Scoped to the branch being written: it holds its own contributor claim
+	// for a key, and reading it needs no R on $archive.
+	held, err := c.ContributorsFor(ctx, rankedb.Scope(branch), pubkey)
 	if err != nil {
 		return "", fmt.Errorf("find contributor: %w", err)
 	}
 	var found []string
-	for _, claim := range rankedb.ContributorsFor(all, pubkey) {
+	for _, claim := range held {
 		found = append(found, claim.ID().String())
 	}
 	switch len(found) {
 	case 0:
-		return "", fmt.Errorf("no contributor on branch %q carries this signing key's public key — create the branch with `ranke-client branch create %s --signing-key ...`, or name an existing contributor with --contributor-id", branch, branch)
+		return "", fmt.Errorf("no contributor on branch %q carries this signing key's public key — create the branch with `ranke-client branch create %s --signing-key ...`, or admit the key with `ranke-client contributor add %s --signing-key ...`", branch, branch, branch)
 	case 1:
 		return found[0], nil
 	}
