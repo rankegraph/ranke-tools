@@ -34,9 +34,10 @@ LDFLAGS ?=
 
 RANKE_DB_REPO ?= rankegraph/ranke-db
 
-# The one dependency that carries the graph contract: every tool here builds and signs
-# its claims with it, as an external consumer of the public module (see README.md).
+# The two dependencies that carry the graph contract: ranke-go builds and signs the
+# claims, ranke-db's client sends them (see README.md).
 RANKE_GO_MODULE ?= github.com/rankegraph/ranke-go
+RANKE_DB_MODULE ?= github.com/rankegraph/ranke-db
 
 .PHONY: all help build test vet fmt lint check tidy docs docs-clean upgrade check-clean-tree check-release-bump \
         release-gate release major minor patch breaking feature fix
@@ -108,7 +109,7 @@ docs: ## Pull the latest ranke-graph documents (papers, spec, glossary) into doc
 docs-clean: ## Remove the pulled paper references
 	rm -rf $(PAPERS_DIR)
 
-upgrade: ## Move every pin to its latest: the ranke-go module, ranke-db's release binary (and install it), and the cached release-cycle.sh
+upgrade: ## Move every pin to its latest: ranke-go, ranke-db (client module and release binary, in step), and the cached release-cycle.sh
 	@command -v curl >/dev/null 2>&1 || { echo "ERROR: curl not found"; exit 1; }
 	@latest=$$(curl -fsSL https://api.github.com/repos/$(RANKE_DB_REPO)/releases/latest \
 		| grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4); \
@@ -124,6 +125,16 @@ upgrade: ## Move every pin to its latest: the ranke-go module, ranke-db's releas
 	@before=$$(go list -m -f '{{.Version}}' $(RANKE_GO_MODULE)); \
 		go get $(RANKE_GO_MODULE)@latest && go mod tidy && \
 		echo ">> $(RANKE_GO_MODULE): $$before -> $$(go list -m -f '{{.Version}}' $(RANKE_GO_MODULE))"
+	@# The client module moves to the release the pinned server ships in: a client
+	@# and the server it talks to have no business drifting apart.
+	@pinned=$$(cat server/.rankedb-version); \
+		before=$$(go list -m -f '{{.Version}}' $(RANKE_DB_MODULE)); \
+		if [ "$$before" = "$$pinned" ]; then \
+			echo ">> $(RANKE_DB_MODULE) already at $$pinned"; \
+		else \
+			go get $(RANKE_DB_MODULE)@$$pinned && go mod tidy && \
+			echo ">> $(RANKE_DB_MODULE): $$before -> $$pinned"; \
+		fi
 	@rm -f $(RELEASE_CYCLER)
 	@$(MAKE) $(RELEASE_CYCLER)
 

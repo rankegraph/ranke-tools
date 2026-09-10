@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / run
 // type:    logic
 // job:     wires one action together: connect, prepare (find-or-build + content_hash scan) where
 // an action needs it, build claims, contribute only what's new
@@ -6,10 +6,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto"
 	"crypto/ed25519"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -19,28 +19,14 @@ import (
 	"github.com/spf13/cobra"
 
 	rankedb "github.com/rankegraph/ranke-db/client"
+	"github.com/rankegraph/ranke-db/cmd/ranke-client/contributor"
+	"github.com/rankegraph/ranke-db/cmd/ranke-client/instance"
 	"github.com/rankegraph/ranke-go"
-	"github.com/rankegraph/ranke-go/keysource"
 )
-
-// loadSigningKey reads the contributor's ed25519 key through keysource's
-// grammar — a path, file:PATH, env:NAME, stdin or prompt — so every app built
-// on ranke-go finds a key by one set of rules, the mode check among them.
-func loadSigningKey(source string) (ed25519.PrivateKey, error) {
-	material, err := keysource.Load(source, os.Stdin, keysource.WithTTY())
-	if err != nil {
-		return nil, err
-	}
-	key, err := ranke.ParseEd25519PrivateKeyPEM(material)
-	if err != nil {
-		return nil, fmt.Errorf("signing key %s: %w", source, err)
-	}
-	return key, nil
-}
 
 // loadContributor fetches and binds the contributor claim id names, whether
 // --contributor-id gave it or the signing key found it.
-func loadContributor(ctx context.Context, c *rankedb.Client, branch, id string, key ed25519.PrivateKey) (ranke.Contributor, error) {
+func loadContributor(ctx context.Context, c *rankedb.Client, branch, id string, key crypto.Signer) (ranke.Contributor, error) {
 	parsed, err := ranke.ParseId(id)
 	if err != nil {
 		return nil, fmt.Errorf("contributor id %q: %w", id, err)
@@ -54,6 +40,31 @@ func loadContributor(ctx context.Context, c *rankedb.Client, branch, id string, 
 		return nil, fmt.Errorf("bind contributor %s: %w", id, err)
 	}
 	return self, nil
+}
+
+// refTarget names the single commit a command works on, --git-branch and
+// --git-tag resolving under their own refs/ namespace where --ref leaves the
+// order to git.
+func refTarget(ref, branch, tag string) (string, error) {
+	var given []string
+	for _, f := range []struct {
+		flag, value string
+	}{{"--ref", ref}, {"--git-branch", branch}, {"--git-tag", tag}} {
+		if f.value != "" {
+			given = append(given, f.flag)
+		}
+	}
+	switch {
+	case len(given) == 0:
+		return "", fmt.Errorf("one of --ref, --git-branch, or --git-tag is required")
+	case len(given) > 1:
+		return "", fmt.Errorf("%s name a commit each — give one", strings.Join(given, " and "))
+	case branch != "":
+		return refSpec{kind: "branch", name: branch}.fullRef(), nil
+	case tag != "":
+		return refSpec{kind: "tag", name: tag}.fullRef(), nil
+	}
+	return ref, nil
 }
 
 // resolveRef turns the ref a command names into its commit sha, in
@@ -83,54 +94,56 @@ func missingRef(ref string) error {
 	return fmt.Errorf("%q names no tag, branch, or commit in this clone", ref)
 }
 
+// mintContributor generates a keypair and the contributor claim it signs
+// under — ranke-db's own shape for one, so every tool here registers alike.
+func mintContributor() (ranke.Contributor, ed25519.PrivateKey, error) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	pubkey, err := ranke.EncodePublicKey(pub)
+	if err != nil {
+		return nil, nil, err
+	}
+	self, err := rankedb.NewContributor(ranke.Keypair{Private: priv, Pubkey: pubkey})
+	if err != nil {
+		return nil, nil, err
+	}
+	return self, priv, nil
+}
+
 // contributorIDForKey finds the contributor carrying the signing key's
 // pubkey. A lookup, never a mint (-> DESIGN.md).
-func contributorIDForKey(ctx context.Context, c *rankedb.Client, branch string, key ed25519.PrivateKey) (string, error) {
-	pubkey, err := ranke.EncodePublicKey(key.Public())
-	if err != nil {
-		return "", fmt.Errorf("encode public key: %w", err)
-	}
-	// Each contributor claim carries its pubkey inline, so the match needs no
-	// further fetch. No index runs from a pubkey to the claim holding it.
+func contributorIDForKey(ctx context.Context, c *rankedb.Client, branch string, pubkey []byte) (string, error) {
+	// A branch holds its own contributor claim for a key (ranke-db v1.26), and
+	// reading it needs no R on $archive, which c.Contributors would.
 	all, err := queryClaims(ctx, c, ranke.Query{
 		Select: ranke.Select{Branch: branch},
-		Where:  &ranke.Where{Field: "type", Test: &ranke.Comparison{Eq: ranke.NodeTypeContributor}},
+		Where:  &ranke.Where{Field: "type", Test: &ranke.Comparison{Eq: ranke.NodeContributor}},
 	})
 	if err != nil {
 		return "", fmt.Errorf("find contributor: %w", err)
 	}
 	var found []string
-	for _, claim := range all {
-		self, err := claim.AsContributor(ctx, nil)
-		if err != nil {
-			continue
-		}
-		if bytes.Equal(self.Pubkey(), pubkey) {
-			found = append(found, claim.ID().String())
-		}
+	for _, claim := range rankedb.ContributorsFor(all, pubkey) {
+		found = append(found, claim.ID().String())
 	}
 	switch len(found) {
 	case 0:
-		return "", fmt.Errorf("no contributor on branch %q carries this signing key's public key — register one with `ranke-git identity register`, or name an existing one with --contributor-id", branch)
+		return "", fmt.Errorf("no contributor on branch %q carries this signing key's public key — create the branch with `ranke-client branch create %s --signing-key ...`, or name an existing contributor with --contributor-id", branch, branch)
 	case 1:
 		return found[0], nil
 	}
-	// Nothing makes a pubkey unique: one key registered twice is two identities
-	// carrying different provenance, and only the caller knows which it meant.
+	// Nothing makes a pubkey unique: one key registered twice is two
+	// contributors with different provenance, and only the caller knows which.
 	return "", fmt.Errorf("%d contributors on branch %q carry this key (%s) — name the one to sign as with --contributor-id", len(found), branch, strings.Join(found, ", "))
 }
 
-// dial points a client at addr, presenting at most one credential — the
-// endpoint routes on the scheme it is given, and refuses two as ambiguous.
+// dial points a client at addr with whatever credential the flags carry,
+// through ranke-client's own wiring.
 func dial(addr string, o *options) (*rankedb.Client, error) {
-	var opts []rankedb.Option
-	switch {
-	case o.token != "":
-		opts = append(opts, rankedb.WithToken(o.token))
-	case o.apiKey != "":
-		opts = append(opts, rankedb.WithAPIKey(o.apiKey))
-	}
-	c, err := rankedb.New(addr, opts...)
+	inst := instance.Instance{URL: addr, Token: o.token, APIKey: o.apiKey, Macaroon: o.macaroon}
+	c, err := inst.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", addr, err)
 	}
@@ -154,7 +167,7 @@ func connect(ctx context.Context, o *options) (*session, error) {
 	if o.signingKey == "" {
 		return nil, fmt.Errorf("--signing-key is required")
 	}
-	key, err := loadSigningKey(o.signingKey)
+	pair, err := contributor.Load(o.signingKey, os.Stdin)
 	if err != nil {
 		return nil, err
 	}
@@ -167,25 +180,30 @@ func connect(ctx context.Context, o *options) (*session, error) {
 	}
 	id := o.contributorID
 	if id == "" {
-		if id, err = contributorIDForKey(ctx, c, o.branch, key); err != nil {
+		if id, err = contributorIDForKey(ctx, c, o.branch, pair.Pubkey); err != nil {
 			return nil, err
 		}
 	}
-	contributor, err := loadContributor(ctx, c, o.branch, id, key)
+	self, err := loadContributor(ctx, c, o.branch, id, pair.Private)
 	if err != nil {
 		return nil, err
 	}
-	return &session{client: c, contributor: contributor, signer: key}, nil
+	return &session{client: c, contributor: self, signer: pair.Private}, nil
 }
 
-// contributeAndReport advances a dev server's clock past the batch, merges
-// the claims, and prints what landed. u is where an externally-content
-// claim's bytes come from.
-func contributeAndReport(ctx context.Context, c *rankedb.Client, u ranke.Universe, branch string, claims []ranke.Claim, out io.Writer) error {
+// contribute merges claims onto branch, a dev server's clock moved past the
+// batch first: it starts at the epoch, and R-C2DATE refuses a claim dated
+// after the base. u holds an externally-content claim's bytes.
+func contribute(ctx context.Context, c *rankedb.Client, u ranke.Universe, branch string, claims []ranke.Claim) (*rankedb.ContributionResult, error) {
 	if _, err := c.Dev().AdvanceClockPast(ctx, claims); err != nil {
-		return err
+		return nil, err
 	}
-	res, err := c.Contribute(ctx, u, branch, claims, rankedb.Creating())
+	return c.Contribute(ctx, u, branch, claims, rankedb.Creating())
+}
+
+// contributeAndReport merges the claims and prints what landed.
+func contributeAndReport(ctx context.Context, c *rankedb.Client, u ranke.Universe, branch string, claims []ranke.Claim, out io.Writer) error {
+	res, err := contribute(ctx, c, u, branch, claims)
 	if err != nil {
 		return err
 	}
@@ -193,11 +211,9 @@ func contributeAndReport(ctx context.Context, c *rankedb.Client, u ranke.Univers
 	return nil
 }
 
-// projectFromRepoURL reads the project name off the repo's own URL — its last
-// segment, without the .git — so the ordinary one-project repository names
-// itself. Every remote form ends the same way, whether scp-like
-// (git@host:acme/widgets.git), a URL, or a local path. A monorepo names its
-// projects with --project instead, one run each.
+// projectFromRepoURL reads the project name off the repo URL's last segment,
+// without the .git — every remote form ends the same way, scp-like or not. A
+// monorepo names its projects with --project instead.
 func projectFromRepoURL(repoURL string) string {
 	name := strings.TrimRight(strings.TrimSpace(repoURL), "/")
 	name = strings.TrimSuffix(name, ".git")

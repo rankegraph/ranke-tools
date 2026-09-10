@@ -29,7 +29,7 @@ func TestParseCVE(t *testing.T) {
 // content, its edges preserved verbatim (derivation/input and relation/cve
 // alike — buildScan itself is edge-type-agnostic, callers build the set).
 func TestBuildScanShape(t *testing.T) {
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	ctx := context.Background()
 	u := ranke.NewMemoryUniverse()
 
@@ -84,7 +84,7 @@ func TestBuildScanShape(t *testing.T) {
 // TestBuildScanContentless pins that omitting scanner output produces a
 // valid, signable claim with no content at all — V-CONTENT permits it.
 func TestBuildScanContentless(t *testing.T) {
-	contributor, signer := testIdentity(t)
+	contributor, signer := testContributor(t)
 	ctx := context.Background()
 	u := ranke.NewMemoryUniverse()
 

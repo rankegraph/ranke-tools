@@ -1,4 +1,4 @@
-// package: main / ranke-git
+// package: main (ranke-git) / demo
 // type:    entrypoint
 // job:     `ranke-git demo local` — a small multi-branch, tagged repo, backed up and
 // restored, both kept on disk — illustrative, not one of the tool's real actions
@@ -8,7 +8,6 @@ package main
 import (
 	"context"
 	"crypto/ed25519"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -57,7 +56,7 @@ func runDemo(out io.Writer) error {
 		return err
 	}
 
-	contributor, signer, err := demoIdentity()
+	contributor, signer, err := demoContributor()
 	if err != nil {
 		return err
 	}
@@ -197,27 +196,8 @@ func demoCommit(g gitRepo, files []demoFile, message string, at time.Time) error
 	return err
 }
 
-// demoIdentity mints a throwaway root contributor — never an application's
-// key, same as the test identity (-> convert_test.go, testIdentity).
-func demoIdentity() (ranke.Contributor, ed25519.PrivateKey, error) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, nil, err
-	}
-	encoded, err := ranke.EncodePublicKey(pub)
-	if err != nil {
-		return nil, nil, err
-	}
-	claim, err := ranke.NewClaim(ranke.NodeTypeContributor, nil).
-		WithInlineContent(encoded).
-		WithEncoding(ranke.EncodingOctetStream).
-		Sign(priv)
-	if err != nil {
-		return nil, nil, err
-	}
-	self, err := claim.AsContributor(context.Background(), nil, priv)
-	if err != nil {
-		return nil, nil, err
-	}
-	return self, priv, nil
+// demoContributor mints a throwaway root contributor — never an application's
+// key, same as the tests' own (-> convert_test.go, testContributor).
+func demoContributor() (ranke.Contributor, ed25519.PrivateKey, error) {
+	return mintContributor()
 }

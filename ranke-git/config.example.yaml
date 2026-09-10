@@ -5,9 +5,11 @@
 # one-off --branch override on the command line works as you'd expect.
 
 server: https://ranke-db.example.com
-# One credential; the endpoint rejects two as ambiguous.
+# One credential; the endpoint rejects two as ambiguous. A macaroon is the one
+# carrying caveats.
 token: ""
 api_key: ""
+macaroon: ""
 
 # Omit contributor_id to sign as whichever contributor carries this key.
 contributor_id: ""
