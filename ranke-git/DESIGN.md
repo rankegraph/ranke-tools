@@ -263,6 +263,17 @@ safely (a CI secret store, a vault) is the caller's job — this command's job e
 "a real identity now exists and here is its key." Verified live: the printed
 `--signing-key` works unmodified as input to a real `snapshot` call.
 
+`--signing-key` resolves through `keysource` in ranke-go, which holds the
+grammar — a path, `file:PATH`, `env:NAME`, `stdin`, `prompt` — for every app
+built on the library, so the rules cannot differ between them. `env:` is what
+CI wants: a runner is handed its secrets as environment, and a workflow that
+writes the PEM out first leaves the identity on a disk it does not own. The
+two refusals are upstream's too, and worth naming: a key file readable beyond
+its owner, on the ssh precedent, and key material passed where a source
+belongs, which is already in the process table and the CI log by the time it
+arrives. `ranke.ParseEd25519PrivateKeyPEM` then reads those bytes, the
+loading surface having taken a path and nothing else until ranke-go v0.31.0.
+
 The key is also what finds the identity again. `connect` reads the branch's
 `contribution/contributor` claims and signs as the one whose pubkey matches the
 key on disk, so a run carries one secret rather than a secret and an id that

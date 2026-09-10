@@ -11,6 +11,8 @@ api_key: ""
 
 # Omit contributor_id to sign as whichever contributor carries this key.
 contributor_id: ""
+# A path, or file:path | env:VAR | stdin | prompt — env: is the CI one, since
+# the key then never lands on the runner's disk.
 signing_key: /path/to/contributor.pem
 
 # Omit to take the checkout's own origin.

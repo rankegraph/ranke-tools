@@ -10,8 +10,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"os"
@@ -21,28 +19,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rankegraph/ranke-go"
+	"github.com/rankegraph/ranke-go/keysource"
 )
 
-// loadSigningKey reads an ed25519 private key from a PKCS#8 PEM file — the
-// contributor's own key, an application-held secret, never minted here.
-func loadSigningKey(path string) (ed25519.PrivateKey, error) {
-	data, err := os.ReadFile(path)
+// loadSigningKey reads the contributor's ed25519 key through keysource's
+// grammar — a path, file:PATH, env:NAME, stdin or prompt — so every app built
+// on ranke-go finds a key by one set of rules, the mode check among them.
+func loadSigningKey(source string) (ed25519.PrivateKey, error) {
+	material, err := keysource.Load(source, os.Stdin, keysource.WithTTY())
 	if err != nil {
-		return nil, fmt.Errorf("signing key: %w", err)
+		return nil, err
 	}
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, fmt.Errorf("signing key %s: not valid PEM", path)
-	}
-	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	key, err := ranke.ParseEd25519PrivateKeyPEM(material)
 	if err != nil {
-		return nil, fmt.Errorf("signing key %s: %w", path, err)
+		return nil, fmt.Errorf("signing key %s: %w", source, err)
 	}
-	priv, ok := key.(ed25519.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("signing key %s: is %T, want ed25519.PrivateKey", path, key)
-	}
-	return priv, nil
+	return key, nil
 }
 
 // loadContributor fetches and binds the contributor claim id names, whether

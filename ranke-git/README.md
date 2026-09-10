@@ -43,6 +43,33 @@ signs as the one whose public key matches. `--contributor-id` picks between
 them where one key was registered twice, two identities carrying different
 provenance.
 
+### Where the signing key comes from
+
+`--signing-key` takes a path, or one of the spellings `ranke-go`'s
+[`keysource`](https://github.com/rankegraph/ranke-go) grammar defines, which
+every app on the library shares:
+
+| Source | For |
+| --- | --- |
+| `contributor.pem`, `file:contributor.pem` | a mounted secret — Kubernetes, `/run/secrets`, systemd's `LoadCredential` |
+| `env:RANKE_SIGNING_KEY` | CI, which hands secrets over as environment; the key never reaches the runner's disk |
+| `stdin` | a pipeline holding the key already |
+| `prompt` | a person, pasting it and ending with a blank line |
+
+Two refusals come with the grammar. A key file anybody but its owner can read
+is rejected, the way `ssh` rejects one, and `identity register` writes `0600`.
+Key material passed where a source belongs — the PEM itself, rather than a
+path or `env:NAME` — is rejected as compromised, because by then it has
+reached the process table, the shell history and any CI log; rotate that key.
+A pasted `prompt` echoes: a paste nobody can see is a paste nobody can check.
+
+```yaml
+env:
+  RANKE_SIGNING_KEY: ${{ secrets.RANKE_SIGNING_KEY }}
+run: ranke-git snapshot --server "$RANKE_SERVER" --signing-key env:RANKE_SIGNING_KEY \
+       --clone . --git-tag "$TAG"
+```
+
 A URL carrying credentials — `https://gitlab-ci-token:<token>@…`, as some
 runners check out with — is recorded without them, since the repo URL becomes
 the repository entity's own name. An ssh remote keeps its `git@`, which a
