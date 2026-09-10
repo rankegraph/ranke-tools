@@ -7,6 +7,8 @@ does not.
 
 ## Unreleased
 
+## v0.5.0 — 2026-09-10
+
 **`--signing-key` finds its own contributor.** `ranke-git` reads the branch's
 contributors and signs as the one carrying that key's public key, so
 `--contributor-id` is needed only where one key was registered twice. A key no
