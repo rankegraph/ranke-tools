@@ -1,15 +1,15 @@
 // package: main (ranke-git) / convert
 // type:    logic
-// job:     converts git state to Ranke claims and back, byte-exact (-> DESIGN.md)
+// job:     converts git state to Ranke claims, byte-exact — the way back is restore.go's
 // limits:  local only — no ranke-db reads or writes; prepare.go reads the server and
 // hands this a prep to reuse from
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -29,22 +29,26 @@ const (
 	nodeRef        = "source/" + gitPrefix + "ref" // a branch or tag name, as it resolved at backup time
 	nodeRepository = "entity/repository"
 	nodeProject    = "entity/project"
+	nodeVersion    = "entity/version" // the tag or commit a run archived, as a thing in the world
 )
 
 // The structural and semantic edges beyond the automatic contributor edge.
 const (
-	edgeTree     = "derivation/tree"      // commit -> its root tree
-	edgeEntry    = "derivation/entry"     // tree -> one entry; fields: name, mode
-	edgeParent   = "derivation/parent"    // commit -> a git parent (backup only)
-	edgePointsAt = "derivation/points_at" // ref -> a commit or tag object; tag -> its commit
-	edgeInput    = "derivation/input"     // entity -> its founding commit (D1)
-	edgeHostedIn = "relation/hosted_in"   // project -> repository
+	edgeTree      = "derivation/tree"      // commit -> its root tree
+	edgeEntry     = "derivation/entry"     // tree -> one entry; fields: name, mode
+	edgeParent    = "derivation/parent"    // commit -> a git parent (backup only)
+	edgePointsAt  = "derivation/points_at" // ref -> a commit or tag object; tag -> its commit
+	edgeInput     = "derivation/input"     // entity -> its founding commit (D1)
+	edgeHostedIn  = "relation/hosted_in"   // project -> repository
+	edgeVersionOf = "relation/version_of"  // version -> project
 )
 
 // Claim lookup keys, alongside content_hash (-> DESIGN.md).
 const (
-	gitShaField    = "git_sha"
-	parentShaField = "parent_git_sha"
+	gitShaField      = "git_sha"
+	parentShaField   = "parent_git_sha"
+	versionNameField = "version"
+	projectField     = "name"
 )
 
 // versionField records which ranke-git built the commit claim — the head of
@@ -69,6 +73,7 @@ type made struct {
 	id     ranke.Id
 	claim  ranke.Claim
 	height uint64
+	gitSha string // a commit's own sha, for the version entity naming it
 }
 
 // reused is what the preparational phase found already on the server for one
@@ -83,6 +88,7 @@ type reused struct {
 type prep struct {
 	repository  *reused
 	project     *reused
+	version     *reused
 	knownHashes map[string]reused // content_hash string -> existing commit/tree/blob/tag
 }
 
@@ -100,6 +106,7 @@ type converter struct {
 	followParents bool          // backup's full history vs. snapshot's one commit
 	scope         []string      // snapshot only; nil = the whole tree
 	scopeSeen     map[string]bool
+	archivedTag   string // the tag a run archived, empty where it named a commit instead
 	prep          prep
 }
 
@@ -153,9 +160,9 @@ func scopeMatch(scope []string, path string) scopeRelation {
 }
 
 // gitToClaims converts one commit: ref resolved, no parent history, scope
-// optional — snapshot's shape. A zero at defaults to now.
+// optional — snapshot's shape. tag names the version entity, a zero at now.
 func gitToClaims(
-	ctx context.Context, g gitRepo, ref string, scope []string, u ranke.Universe,
+	ctx context.Context, g gitRepo, ref, tag string, scope []string, u ranke.Universe,
 	contributor ranke.Contributor, signer crypto.Signer, repoURL, project string, p prep, at time.Time,
 ) ([]ranke.Claim, error) {
 	if at.IsZero() {
@@ -167,7 +174,7 @@ func gitToClaims(
 	}
 	c := &converter{
 		ctx: ctx, git: g, u: u, contributor: contributor, signer: signer,
-		at: at, bySha: map[string]made{},
+		at: at, bySha: map[string]made{}, archivedTag: tag,
 		scope: normalizeScope(scope), scopeSeen: map[string]bool{}, prep: p,
 	}
 	commit, err := c.commit(sha)
@@ -211,6 +218,7 @@ func backupToClaims(
 	c := &converter{
 		ctx: ctx, git: g, u: u, contributor: contributor, signer: signer,
 		at: at, bySha: map[string]made{}, followParents: true, prep: p,
+		archivedTag: firstTag(refs),
 	}
 	var primary made
 	for i, r := range refs {
@@ -225,14 +233,28 @@ func backupToClaims(
 	return c.finish(primary, repoURL, project)
 }
 
-// finish adds the repository and project entities (reused from prep if
-// found there), anchored to commit, and returns everything newly built.
+// firstTag names the version a backup archives; branches name none.
+func firstTag(refs []refSpec) string {
+	for _, r := range refs {
+		if r.kind == "tag" {
+			return r.name
+		}
+	}
+	return ""
+}
+
+// finish adds the repository, project and version entities (reused from prep
+// if found there), anchored to commit, and returns everything newly built.
 func (c *converter) finish(commit made, repoURL, project string) ([]ranke.Claim, error) {
 	repo, err := c.repository(repoURL, commit)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := c.project(project, commit, repo); err != nil {
+	proj, err := c.project(project, commit, repo)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := c.version(commit, proj, project); err != nil {
 		return nil, err
 	}
 	return c.claims, nil
@@ -305,6 +327,7 @@ func (c *converter) commit(sha string) (made, error) {
 	if err != nil {
 		return made{}, fmt.Errorf("commit %s: %w", sha, err)
 	}
+	m.gitSha = sha
 	c.bySha[sha] = m
 	return m, nil
 }
@@ -556,6 +579,38 @@ func (c *converter) project(name string, commit, repo made) (made, error) {
 	return m, nil
 }
 
+// version reuses prep's match, else builds entity/version fresh: the tag a
+// run archived, or the commit's own sha where none named it (-> DESIGN.md).
+func (c *converter) version(commit, project made, projectName string) (made, error) {
+	if c.prep.version != nil {
+		return made{id: c.prep.version.id, height: c.prep.version.height}, nil
+	}
+	input, err := ranke.NewEdge(ranke.EdgeConfig{
+		Reference: commit.id, Referenced: commit.claim, Type: edgeInput,
+	})
+	if err != nil {
+		return made{}, fmt.Errorf("version: input edge: %w", err)
+	}
+	versionOf, err := ranke.NewEdge(ranke.EdgeConfig{
+		Reference: project.id, Referenced: project.claim, Type: edgeVersionOf,
+		RelationDirection: ranke.RelationTo,
+	})
+	if err != nil {
+		return made{}, fmt.Errorf("version: version_of edge: %w", err)
+	}
+	height := commit.height
+	if project.height > height {
+		height = project.height
+	}
+	name := cmp.Or(c.archivedTag, commit.gitSha)
+	fields := map[string]string{versionNameField: name, projectField: projectName, gitShaField: commit.gitSha}
+	m, err := c.writeFact(nodeVersion, []byte(name), fields, height, []ranke.Edge{input, versionOf})
+	if err != nil {
+		return made{}, fmt.Errorf("version: %w", err)
+	}
+	return m, nil
+}
+
 // writeFact builds one small claim with no git object of its own — an entity
 // or a ref: inline content, fields for a later find-or-build lookup.
 func (c *converter) writeFact(typ string, content []byte, fields map[string]string, childHeight uint64, edges []ranke.Edge) (made, error) {
@@ -575,99 +630,4 @@ func (c *converter) writeFact(typ string, content []byte, fields map[string]stri
 	}
 	c.claims = append(c.claims, claim)
 	return made{id: claim.ID(), claim: claim, height: height}, nil
-}
-
-// claimsToGit restores claims into dest: objects replayed, refs recreated
-// from their points_at edge, origin from the repository entity's url
-// (-> DESIGN.md). refs distinguishes branches from tags in a backup.
-func claimsToGit(ctx context.Context, dest gitRepo, u ranke.Universe, claims []ranke.Claim) (commitSha string, refs map[string]string, err error) {
-	byID := make(map[string]ranke.Claim, len(claims))
-	for _, claim := range claims {
-		byID[claim.ID().String()] = claim
-	}
-
-	type pendingRef struct{ kind, name, targetID string }
-	var pending []pendingRef
-	var repoURL string
-
-	for _, claim := range claims {
-		typ := claim.Node().Type()
-		switch typ {
-		case nodeRepository:
-			if url, err := claim.Node().GetField("url"); err == nil {
-				repoURL = url
-			}
-			continue
-		case nodeProject:
-			continue
-		case nodeRef:
-			name, _ := claim.Node().GetField("name")
-			kind, _ := claim.Node().GetField("kind")
-			points := claim.Edges(ranke.EdgeFilterType{Type: edgePointsAt})
-			if len(points) != 1 {
-				return "", nil, fmt.Errorf("restore: ref %q has %d points_at edge(s), want 1", name, len(points))
-			}
-			pending = append(pending, pendingRef{kind: kind, name: name, targetID: points[0].Reference().String()})
-			continue
-		}
-
-		var kind string
-		switch typ {
-		case nodeBlob:
-			kind = "blob"
-		case nodeTree:
-			kind = "tree"
-		case nodeCommit:
-			kind = "commit"
-		case nodeTag:
-			kind = "tag"
-		default:
-			return "", nil, fmt.Errorf("restore: claim %s has unexpected type %q", claim.ID(), typ)
-		}
-		r, err := claim.GetContent(ctx, u)
-		if err != nil {
-			return "", nil, fmt.Errorf("restore: claim %s: content: %w", claim.ID(), err)
-		}
-		payload, err := io.ReadAll(r)
-		if err != nil {
-			return "", nil, fmt.Errorf("restore: claim %s: read content: %w", claim.ID(), err)
-		}
-		sha, err := dest.hashObjectWrite(kind, payload)
-		if err != nil {
-			return "", nil, fmt.Errorf("restore: claim %s: write %s: %w", claim.ID(), kind, err)
-		}
-		if kind == "commit" {
-			commitSha = sha
-		}
-	}
-	if commitSha == "" && len(pending) == 0 {
-		return "", nil, fmt.Errorf("restore: no commit claim in the set")
-	}
-
-	refs = make(map[string]string, len(pending))
-	for _, p := range pending {
-		target, ok := byID[p.targetID]
-		if !ok {
-			return "", nil, fmt.Errorf("restore: ref %q points at a claim not in the set", p.name)
-		}
-		sha, err := target.Node().GetField(gitShaField)
-		if err != nil {
-			return "", nil, fmt.Errorf("restore: ref %q: target has no %s: %w", p.name, gitShaField, err)
-		}
-		full := "refs/heads/" + p.name
-		if p.kind == "tag" {
-			full = "refs/tags/" + p.name
-		}
-		if _, err := dest.run("update-ref", full, sha); err != nil {
-			return "", nil, fmt.Errorf("restore: create ref %s: %w", full, err)
-		}
-		refs[p.name] = sha
-	}
-
-	if repoURL != "" {
-		if _, err := dest.run("remote", "add", "origin", repoURL); err != nil {
-			return "", nil, fmt.Errorf("restore: configure origin: %w", err)
-		}
-	}
-	return commitSha, refs, nil
 }

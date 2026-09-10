@@ -5,6 +5,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"fmt"
@@ -38,12 +39,20 @@ func backupCmd(o *options) *cobra.Command {
 			for _, t := range tags {
 				refs = append(refs, refSpec{kind: "tag", name: t})
 			}
-			for _, r := range refs {
-				if _, err := resolveRef(g, r.fullRef()); err != nil {
+			var primarySha string
+			for i, r := range refs {
+				sha, err := resolveRef(g, r.fullRef())
+				if err != nil {
 					return err
 				}
+				if i == 0 {
+					primarySha = sha
+				}
 			}
-			return run(cmd, o, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
+			// A tag names the version a backup archives; branches alone leave the
+			// primary commit's own sha to name it (-> DESIGN.md).
+			version := cmp.Or(firstTag(refs), primarySha)
+			return run(cmd, o, version, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
 				return backupToClaims(ctx, g, refs, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
 			})
 		},

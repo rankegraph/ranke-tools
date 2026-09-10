@@ -200,7 +200,7 @@ func TestRoundTripIsByteExact(t *testing.T) {
 	u := ranke.NewMemoryUniverse()
 	ctx := context.Background()
 
-	claims, err := gitToClaims(ctx, g, origSha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	claims, err := gitToClaims(ctx, g, origSha, "", nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
 		t.Fatalf("gitToClaims: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestRoundTripDedupesRepeatedBlobs(t *testing.T) {
 
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
-	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	claims, err := gitToClaims(context.Background(), g, sha, "", nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
 		t.Fatalf("gitToClaims: %v", err)
 	}
@@ -359,7 +359,7 @@ func TestSubmoduleIsRefused(t *testing.T) {
 
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
-	_, err = gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	_, err = gitToClaims(context.Background(), g, sha, "", nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err == nil {
 		t.Fatal("gitToClaims accepted a gitlink, want a refusal")
 	}
@@ -477,7 +477,7 @@ func TestScopedCapture(t *testing.T) {
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
 	ctx := context.Background()
-	claims, err := gitToClaims(ctx, g, "v1", []string{"services/api"}, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	claims, err := gitToClaims(ctx, g, "v1", "", []string{"services/api"}, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
 		t.Fatalf("gitToClaims: %v", err)
 	}
@@ -521,7 +521,7 @@ func TestScopedCaptureRefusesAnUnreachedPath(t *testing.T) {
 
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
-	_, err := gitToClaims(context.Background(), g, sha, []string{"does/not/exist"}, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	_, err := gitToClaims(context.Background(), g, sha, "", []string{"does/not/exist"}, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err == nil {
 		t.Fatal("gitToClaims accepted a scope path that doesn't exist, want a refusal")
 	}

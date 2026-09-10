@@ -22,7 +22,7 @@ func TestBlobAndEntryPathFields(t *testing.T) {
 
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
-	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	claims, err := gitToClaims(context.Background(), g, sha, "", nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
 		t.Fatalf("gitToClaims: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestVersionFieldOnlyOnCommit(t *testing.T) {
 
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
-	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	claims, err := gitToClaims(context.Background(), g, sha, "", nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
 		t.Fatalf("gitToClaims: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestDatedOnCommitAndBlob(t *testing.T) {
 
 	contributor, signer := testContributor(t)
 	u := ranke.NewMemoryUniverse()
-	claims, err := gitToClaims(context.Background(), g, sha, nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
+	claims, err := gitToClaims(context.Background(), g, sha, "", nil, u, contributor, signer, testRepoURL, testProject, prep{}, time.Time{})
 	if err != nil {
 		t.Fatalf("gitToClaims: %v", err)
 	}

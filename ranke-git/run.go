@@ -220,14 +220,9 @@ func projectFromRepoURL(repoURL string) string {
 	return name
 }
 
-// shapeFunc builds one action's claims into u, once the contributor,
-// signer, and prep are ready.
-type shapeFunc func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error)
-
-// run connects, prepares, builds via shape, contributes only what's new —
-// snapshot/backup's shared shape (-> DESIGN.md); attach does its own.
-func run(cmd *cobra.Command, o *options, shape shapeFunc) error {
-	ctx := cmd.Context()
+// resolveNames fills the repo URL from the clone's origin and the project
+// from that URL, where the flags left either unnamed.
+func (o *options) resolveNames() error {
 	if o.repoURL == "" {
 		if o.clone == "" {
 			return fmt.Errorf("--repo is required")
@@ -244,14 +239,28 @@ func run(cmd *cobra.Command, o *options, shape shapeFunc) error {
 			return fmt.Errorf("--project is required: %q carries no name to derive one from", o.repoURL)
 		}
 	}
+	return nil
+}
+
+// shapeFunc builds one action's claims into u, once the contributor,
+// signer, and prep are ready.
+type shapeFunc func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error)
+
+// run connects, prepares, builds via shape, contributes only what's new —
+// snapshot/backup's shared shape (-> DESIGN.md); attach does its own.
+func run(cmd *cobra.Command, o *options, version string, shape shapeFunc) error {
+	ctx := cmd.Context()
+	if err := o.resolveNames(); err != nil {
+		return err
+	}
 	s, err := connect(ctx, o)
 	if err != nil {
 		return err
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, ">> preparing — find or build %s/%s, scanning existing content on %q\n", o.repoURL, o.project, o.branch)
-	p, err := prepare(ctx, s.client, o.branch, o.repoURL, o.project)
+	fmt.Fprintf(out, ">> preparing — find or build %s/%s %s, scanning existing content on %q\n", o.repoURL, o.project, version, o.branch)
+	p, err := prepare(ctx, s.client, o.branch, o.repoURL, o.project, version)
 	if err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"time"
@@ -36,8 +37,11 @@ func snapshotCmd(o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return run(cmd, o, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
-				return gitToClaims(ctx, g, sha, o.paths, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
+			// The tag names the version this archives; a commit named any other
+			// way stands for its own sha (-> DESIGN.md).
+			version := cmp.Or(tag, sha)
+			return run(cmd, o, version, func(ctx context.Context, contributor ranke.Contributor, signer crypto.Signer, p prep, u ranke.Universe) ([]ranke.Claim, error) {
+				return gitToClaims(ctx, g, sha, tag, o.paths, u, contributor, signer, o.repoURL, o.project, p, time.Time{})
 			})
 		},
 	}
